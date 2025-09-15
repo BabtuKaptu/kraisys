@@ -318,50 +318,111 @@ class ModelSpecificationFormV2(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
+        # Информационный блок
+        info_layout = QHBoxLayout()
+
+        info_text = QLabel(
+            "💡 Управление вариантами модели:\n"
+            "• Базовая модель (текущая) - свободный вариант с вариативностью материалов\n"
+            "• Специфические варианты - конкретные версии для производства с фиксированными материалами"
+        )
+        info_text.setWordWrap(True)
+        info_text.setStyleSheet("background: #e8f4fd; padding: 10px; border-radius: 5px; border: 1px solid #b8dff8;")
+        info_layout.addWidget(info_text)
+
+        # Кнопка создания нового специфического варианта
+        self.create_variant_btn = QPushButton("➕ Создать специфический вариант")
+        self.create_variant_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.create_variant_btn.clicked.connect(self.create_specific_variant)
+        info_layout.addWidget(self.create_variant_btn)
+
+        layout.addLayout(info_layout)
+
+        # Таблица существующих вариантов
+        variants_group = QGroupBox("Специфические варианты данной модели")
+        variants_layout = QVBoxLayout(variants_group)
+
+        self.variants_table = QTableWidget()
+        self.variants_table.setColumnCount(7)
+        self.variants_table.setHorizontalHeaderLabels([
+            "Код", "Название", "Материалов", "Стоимость мат.", "Активен", "Создан", "Действия"
+        ])
+
+        header = self.variants_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+
+        header.resizeSection(0, 100)
+        header.resizeSection(2, 100)
+        header.resizeSection(3, 120)
+        header.resizeSection(4, 80)
+        header.resizeSection(5, 100)
+        header.resizeSection(6, 100)
+
+        self.variants_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.variants_table.setAlternatingRowColors(True)
+        self.variants_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+
+        variants_layout.addWidget(self.variants_table)
+        layout.addWidget(variants_group)
+
+        # Блок с базовыми вариантами (старый функционал)
+        basic_variants_group = QGroupBox("Базовые варианты исполнения (для свободной модели)")
+        basic_layout = QVBoxLayout(basic_variants_group)
+
         # Перфорация
-        perf_group = QGroupBox("Варианты перфорации")
-        perf_layout = QVBoxLayout(perf_group)
+        perf_label = QLabel("Варианты перфорации:")
+        basic_layout.addWidget(perf_label)
         self.perf_text = QTextEdit()
         self.perf_text.setPlaceholderText(
-            "Укажите варианты перфорации, каждый с новой строки:\n"
             "Полная перфорация: союзка + берец\n"
             "На союзке\n"
             "На берце\n"
             "Без перфорации"
         )
-        self.perf_text.setMaximumHeight(100)
-        perf_layout.addWidget(self.perf_text)
-        layout.addWidget(perf_group)
+        self.perf_text.setMaximumHeight(60)
+        basic_layout.addWidget(self.perf_text)
 
-        # Подкладка/стелька
-        lining_group = QGroupBox("Варианты подкладки/стельки")
-        lining_layout = QVBoxLayout(lining_group)
+        # Подкладка
+        lining_label = QLabel("Варианты подкладки:")
+        basic_layout.addWidget(lining_label)
         self.lining_text = QTextEdit()
         self.lining_text.setPlaceholderText(
-            "Укажите варианты подкладки:\n"
-            "Полный подклад: кожподклад\n"
+            "Кожподклад\n"
             "Байка\n"
-            "Мех\n"
-            "Эва + черная стелька 7мм с профилем и надписью"
+            "Мех"
         )
-        self.lining_text.setMaximumHeight(100)
-        lining_layout.addWidget(self.lining_text)
-        layout.addWidget(lining_group)
+        self.lining_text.setMaximumHeight(60)
+        basic_layout.addWidget(self.lining_text)
 
         # Другие варианты
-        other_group = QGroupBox("Другие варианты исполнения")
-        other_layout = QVBoxLayout(other_group)
+        other_label = QLabel("Другие варианты:")
+        basic_layout.addWidget(other_label)
         self.other_variants_text = QTextEdit()
         self.other_variants_text.setPlaceholderText(
-            "Укажите другие варианты:\n"
             "Цвета кожи\n"
-            "Типы обработки\n"
-            "Специальные исполнения"
+            "Типы обработки"
         )
-        self.other_variants_text.setMaximumHeight(100)
-        other_layout.addWidget(self.other_variants_text)
-        layout.addWidget(other_group)
+        self.other_variants_text.setMaximumHeight(60)
+        basic_layout.addWidget(self.other_variants_text)
 
+        layout.addWidget(basic_variants_group)
         layout.addStretch()
 
         return widget
@@ -687,6 +748,74 @@ class ModelSpecificationFormV2(QDialog):
 
         return True
 
+    def create_specific_variant(self):
+        """Создание специфического варианта модели"""
+        if not self.model_id:
+            QMessageBox.warning(self, "Внимание", "Сначала сохраните базовую модель")
+            return
+
+        from ui.references.model_specific_variant_form import ModelSpecificVariantForm
+        dialog = ModelSpecificVariantForm(parent=self, db=self.db, model_id=self.model_id)
+        dialog.saved.connect(self.load_variants)
+        dialog.exec()
+
+    def load_variants(self):
+        """Загрузка списка вариантов модели"""
+        if not self.model_id:
+            return
+
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            cursor.execute("""
+                SELECT id, variant_code, variant_name, total_material_cost,
+                       is_active, created_at,
+                       jsonb_array_length(materials) as material_count
+                FROM specifications
+                WHERE model_id = %s
+                ORDER BY created_at DESC
+            """, (self.model_id,))
+
+            variants = cursor.fetchall()
+
+            # Очищаем таблицу
+            self.variants_table.setRowCount(0)
+
+            for variant in variants:
+                row = self.variants_table.rowCount()
+                self.variants_table.insertRow(row)
+
+                self.variants_table.setItem(row, 0, QTableWidgetItem(variant['variant_code'] or ''))
+                self.variants_table.setItem(row, 1, QTableWidgetItem(variant['variant_name'] or ''))
+                self.variants_table.setItem(row, 2, QTableWidgetItem(str(variant['material_count'] or 0)))
+
+                cost = variant['total_material_cost'] or 0
+                self.variants_table.setItem(row, 3, QTableWidgetItem(f"{cost:.2f} руб"))
+
+                active = "Да" if variant['is_active'] else "Нет"
+                self.variants_table.setItem(row, 4, QTableWidgetItem(active))
+
+                created = variant['created_at'].strftime('%d.%m.%Y') if variant['created_at'] else ''
+                self.variants_table.setItem(row, 5, QTableWidgetItem(created))
+
+                # Кнопка действий
+                view_btn = QPushButton("👁 Просмотр")
+                view_btn.clicked.connect(lambda checked, v_id=variant['id']: self.view_variant(v_id))
+                self.variants_table.setCellWidget(row, 6, view_btn)
+
+            cursor.close()
+            self.db.put_connection(conn)
+
+        except Exception as e:
+            print(f"Ошибка загрузки вариантов: {e}")
+
+    def view_variant(self, variant_id):
+        """Просмотр деталей варианта"""
+        QMessageBox.information(self, "Просмотр варианта",
+                               f"Просмотр варианта ID: {variant_id}\n"
+                               "Функционал в разработке")
+
     def load_model_data(self):
         """Загрузка данных модели для редактирования"""
         try:
@@ -788,6 +917,9 @@ class ModelSpecificationFormV2(QDialog):
 
             cursor.close()
             self.db.put_connection(conn)
+
+            # Загружаем варианты модели
+            self.load_variants()
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные модели: {e}")

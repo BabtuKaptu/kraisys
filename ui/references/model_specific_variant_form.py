@@ -213,12 +213,12 @@ class ModelSpecificVariantForm(QDialog):
             conn = self.db.get_connection()
             cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-            # Загрузка материалов (кожи и ткани)
+            # Загрузка материалов (кожи и подкладка)
             cursor.execute("""
                 SELECT id, code, name, material_type, unit, price
                 FROM materials
                 WHERE is_active = true
-                AND group_type IN ('LEATHER', 'TEXTILE', 'LINING')
+                AND group_type IN ('LEATHER', 'LINING')
                 ORDER BY material_type, name
             """)
 
