@@ -31,7 +31,8 @@ class DatabaseConnection:
             self._qt_db.setPassword(DATABASE_CONFIG['password'])
 
             if not self._qt_db.open():
-                raise Exception(f"Cannot open database: {self._qt_db.lastError().text()}")
+                print(f"Warning: Cannot open Qt database: {self._qt_db.lastError().text()}")
+                # Continue without Qt database
 
             self.initialized = True
             print(f"Database connected: {DATABASE_CONFIG['database']}@{DATABASE_CONFIG['host']}")

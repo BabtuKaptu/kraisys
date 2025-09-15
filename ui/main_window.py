@@ -18,16 +18,24 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
-        # Добавляем вкладки (пока заглушки)
+        # Добавляем вкладки
         from PyQt6.QtWidgets import QLabel
 
-        # Временные заглушки для вкладок
-        self.models_widget = QLabel("Модели обуви - В разработке")
-        self.models_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        try:
+            from ui.references.models_view import ModelsTableWidget
+            from ui.references.materials_view import MaterialsTableWidget
 
-        self.materials_widget = QLabel("Материалы - В разработке")
-        self.materials_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.models_widget = ModelsTableWidget()
+            self.materials_widget = MaterialsTableWidget()
+        except Exception as e:
+            print(f"Error loading views: {e}")
+            # Заглушки при ошибке
+            self.models_widget = QLabel("Модели обуви - Ошибка загрузки")
+            self.models_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.materials_widget = QLabel("Материалы - Ошибка загрузки")
+            self.materials_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        # Пока заглушки для остальных
         self.stock_widget = QLabel("Склад - В разработке")
         self.stock_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
