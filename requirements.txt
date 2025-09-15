@@ -1,0 +1,18 @@
+# Core dependencies
+sqlmodel==0.0.14
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
+
+# For Desktop UI (PyQt6 option)
+PyQt6==6.6.0
+PyQt6-Qt6==6.6.0
+PyQt6-sip==13.6.0
+
+# For data processing
+pandas==2.1.4
+openpyxl==3.1.2  # Excel export
+
+# Optional: for alternative UI frameworks
+# tkinter - встроен в Python
+# dearpygui==1.10.1
+# flet==0.19.0
