@@ -1,8 +1,7 @@
 """Database connection management for PyQt6 application"""
 import psycopg2
 from psycopg2 import pool
-from PyQt6.QtSql import QSqlDatabase, QSqlQuery
-from sqlmodel import create_engine, Session
+from sqlmodel import create_engine, Session, select
 from config import DATABASE_CONFIG, DATABASE_URL
 
 class DatabaseConnection:
@@ -10,7 +9,7 @@ class DatabaseConnection:
 
     _instance = None
     _engine = None
-    _qt_db = None
+    _pg_pool = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -19,42 +18,57 @@ class DatabaseConnection:
 
     def __init__(self):
         if not hasattr(self, 'initialized'):
-            # SQLModel engine для ORM операций
-            self._engine = create_engine(DATABASE_URL, echo=False, pool_size=5)
+            try:
+                # SQLModel engine для ORM операций
+                self._engine = create_engine(DATABASE_URL, echo=False, pool_size=5)
 
-            # Qt database для таблиц
-            self._qt_db = QSqlDatabase.addDatabase("QPSQL")
-            self._qt_db.setHostName(DATABASE_CONFIG['host'])
-            self._qt_db.setPort(DATABASE_CONFIG['port'])
-            self._qt_db.setDatabaseName(DATABASE_CONFIG['database'])
-            self._qt_db.setUserName(DATABASE_CONFIG['user'])
-            self._qt_db.setPassword(DATABASE_CONFIG['password'])
+                # Проверяем подключение
+                with self.get_session() as session:
+                    session.exec(select(1))
+                    print(f"✓ Database connected: {DATABASE_CONFIG['database']}@{DATABASE_CONFIG['host']}")
 
-            if not self._qt_db.open():
-                print(f"Warning: Cannot open Qt database: {self._qt_db.lastError().text()}")
-                # Continue without Qt database
+                # Создаем пул подключений для прямых SQL запросов
+                self._pg_pool = psycopg2.pool.SimpleConnectionPool(
+                    1, 5,
+                    host=DATABASE_CONFIG['host'],
+                    port=DATABASE_CONFIG['port'],
+                    database=DATABASE_CONFIG['database'],
+                    user=DATABASE_CONFIG['user'],
+                    password=DATABASE_CONFIG['password']
+                )
 
-            self.initialized = True
-            print(f"Database connected: {DATABASE_CONFIG['database']}@{DATABASE_CONFIG['host']}")
+                self.initialized = True
+
+            except Exception as e:
+                print(f"⚠️ Database connection failed: {e}")
+                self.initialized = False
+                raise
 
     @property
     def engine(self):
         return self._engine
 
-    @property
-    def qt_db(self):
-        return self._qt_db
-
     def get_session(self) -> Session:
         """Получить SQLModel сессию"""
         return Session(self._engine)
 
+    def get_connection(self):
+        """Получить прямое psycopg2 соединение из пула"""
+        if self._pg_pool:
+            return self._pg_pool.getconn()
+        return None
+
+    def put_connection(self, conn):
+        """Вернуть соединение в пул"""
+        if self._pg_pool and conn:
+            self._pg_pool.putconn(conn)
+
     def test_connection(self) -> bool:
         """Тестировать подключение"""
         try:
-            query = QSqlQuery()
-            query.exec("SELECT 1")
-            return query.next()
+            with self.get_session() as session:
+                result = session.exec(select(1))
+                return True
         except Exception as e:
             print(f"Connection test failed: {e}")
             return False

@@ -22,11 +22,13 @@ class MainWindow(QMainWindow):
         from PyQt6.QtWidgets import QLabel
 
         try:
-            from ui.references.models_view import ModelsTableWidget
-            from ui.references.materials_view import MaterialsTableWidget
+            from ui.references.models_view_full import ModelsTableFullWidget as ModelsTableWidget
+            from ui.references.materials_view_full import MaterialsTableFullWidget as MaterialsTableWidget
+            from ui.warehouse.warehouse_view import WarehouseWidget
 
             self.models_widget = ModelsTableWidget()
             self.materials_widget = MaterialsTableWidget()
+            self.stock_widget = WarehouseWidget()
         except Exception as e:
             print(f"Error loading views: {e}")
             # Заглушки при ошибке
@@ -34,10 +36,8 @@ class MainWindow(QMainWindow):
             self.models_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.materials_widget = QLabel("Материалы - Ошибка загрузки")
             self.materials_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # Пока заглушки для остальных
-        self.stock_widget = QLabel("Склад - В разработке")
-        self.stock_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.stock_widget = QLabel("Склад - Ошибка загрузки")
+            self.stock_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.orders_widget = QLabel("Заказы - В разработке")
         self.orders_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
