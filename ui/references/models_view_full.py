@@ -6,6 +6,7 @@ from ui.base.base_table_v2 import BaseTableWidgetV2
 from ui.base.base_form import BaseFormDialog
 from ui.references.model_components_dialog_v2 import ModelComponentsDialogV2 as ModelComponentsDialog
 from database.connection import DatabaseConnection
+import psycopg2
 import psycopg2.extras
 import json
 
@@ -15,16 +16,82 @@ class ModelsTableFullWidget(BaseTableWidgetV2):
     def __init__(self, parent=None):
         super().__init__('models', parent)
         self.setWindowTitle("Модели обуви - Полная версия")
+        self.db = DatabaseConnection()
 
     def get_search_columns(self):
         """Колонки для поиска"""
         return ['article', 'name', 'category', 'collection', 'season']
 
     def add_record(self):
+        from ui.references.model_variant_dialog import ModelVariantTypeDialog
         from ui.references.model_specification_form_v2 import ModelSpecificationFormV2
-        dialog = ModelSpecificationFormV2(parent=self)
-        dialog.saved.connect(self.refresh_data)
-        dialog.exec()
+        from ui.references.model_specific_variant_form import ModelSpecificVariantForm
+
+        # Сначала спрашиваем тип модели
+        type_dialog = ModelVariantTypeDialog(self)
+        if type_dialog.exec():
+            variant_type = type_dialog.get_variant_type()
+
+            if variant_type == "free":
+                # Создаем базовую модель (свободный вариант)
+                dialog = ModelSpecificationFormV2(parent=self)
+                dialog.saved.connect(self.refresh_data)
+                dialog.exec()
+            else:
+                # Для специфического варианта сначала нужно выбрать базовую модель
+                model_id = self.select_base_model()
+                if model_id:
+                    dialog = ModelSpecificVariantForm(parent=self, db=self.db, model_id=model_id)
+                    dialog.saved.connect(self.refresh_data)
+                    dialog.exec()
+
+    def select_base_model(self):
+        """Диалог выбора базовой модели для создания специфического варианта"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            # Получаем список всех моделей
+            cursor.execute("""
+                SELECT id, article, name, last_code
+                FROM models
+                ORDER BY article
+            """)
+
+            models = cursor.fetchall()
+            cursor.close()
+            self.db.put_connection(conn)
+
+            if not models:
+                QMessageBox.warning(self, "Внимание", "Нет доступных базовых моделей")
+                return None
+
+            # Создаем список для выбора
+            items = []
+            model_ids = []
+            for model in models:
+                items.append(f"{model['article']} - {model['name']} (Колодка: {model['last_code']})")
+                model_ids.append(model['id'])
+
+            # Показываем диалог выбора
+            item, ok = QInputDialog.getItem(
+                self,
+                "Выбор базовой модели",
+                "Выберите базовую модель для создания специфического варианта:",
+                items,
+                0,
+                False
+            )
+
+            if ok and item:
+                index = items.index(item)
+                return model_ids[index]
+
+            return None
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить модели: {e}")
+            return None
 
     def edit_record(self):
         record_id = self.get_current_record_id()
