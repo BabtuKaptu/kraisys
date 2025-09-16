@@ -41,27 +41,17 @@ class ModelsTableFullWidget(BaseTableWidgetV2):
         return ['article', 'name', 'category', 'collection', 'season']
 
     def add_record(self):
-        from ui.references.model_variant_dialog import ModelVariantTypeDialog
+        """Создание новой базовой модели"""
         from ui.references.model_specification_form_v5 import ModelSpecificationFormV5
-        from ui.references.model_specific_variant_form import ModelSpecificVariantForm
 
-        # Сначала спрашиваем тип модели
-        type_dialog = ModelVariantTypeDialog(self)
-        if type_dialog.exec():
-            variant_type = type_dialog.get_variant_type()
-
-            if variant_type == "free":
-                # Создаем базовую модель (свободный вариант)
-                dialog = ModelSpecificationFormV5(is_variant=False, parent=self)
-                dialog.saved.connect(self.refresh_data)
-                dialog.exec()
-            else:
-                # Для специфического варианта используем специализированную форму
-                model_id = self.select_base_model()
-                if model_id:
-                    dialog = ModelSpecificVariantForm(parent=self, db=self.db, model_id=model_id)
-                    dialog.saved.connect(self.refresh_data)
-                    dialog.exec()
+        # Создаем новую базовую модель напрямую
+        dialog = ModelSpecificationFormV5(
+            model_id=None,  # Новая модель
+            is_variant=False,  # Базовая модель, не вариант
+            parent=self
+        )
+        dialog.saved.connect(self.refresh_data)
+        dialog.exec()
 
     def select_base_model(self):
         """Диалог выбора базовой модели для создания специфического варианта"""
@@ -114,9 +104,13 @@ class ModelsTableFullWidget(BaseTableWidgetV2):
     def edit_record(self):
         record_id = self.get_current_record_id()
         if record_id:
+            from debug_logger import log_debug
+            log_debug(f"🎯 models_view_full.edit_record: вызван для record_id={record_id}")
+
             from ui.references.model_specification_form_v5 import ModelSpecificationFormV5
             # При редактировании определяем тип модели по наличию данных варианта
             # TODO: определить is_variant на основе данных из БД
+            log_debug(f"🎯 models_view_full: создаем ModelSpecificationFormV5 с model_id={record_id}, is_variant=False")
             dialog = ModelSpecificationFormV5(model_id=record_id, is_variant=False, parent=self)
             dialog.saved.connect(self.refresh_data)
             dialog.exec()

@@ -1628,7 +1628,7 @@ class ModelSpecificationFormV4(QDialog):
                         self.model_id,
                         False,  # Не базовая
                         True,   # Активная
-                        variant_name.text() if variant_name else "Новый вариант",
+                        variant_name.text() if variant_name else f"{self.name_input.text()} - Вариант",
                         variant_code.text() if variant_code else "VAR-001",
                         '{}'    # Пустой JSON для материалов
                     ))

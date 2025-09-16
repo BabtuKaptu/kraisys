@@ -14,8 +14,14 @@ class VariantsListDialog(QDialog):
 
     def __init__(self, model_id, db, parent=None):
         super().__init__(parent)
+        from debug_logger import log_debug
+
+        log_debug(f"🏗️ VariantsListDialog INIT: получен model_id={model_id}")
+
         self.model_id = model_id
         self.db = db
+
+        log_debug(f"🏗️ VariantsListDialog: установлен self.model_id={self.model_id}")
 
         self.setWindowTitle("Варианты модели")
         self.setModal(True)
@@ -149,45 +155,47 @@ class VariantsListDialog(QDialog):
 
     def add_variant(self):
         """Добавить новый вариант"""
-        from ui.references.model_specific_variant_form import ModelSpecificVariantForm
+        from debug_logger import log_debug
 
-        dialog = ModelSpecificVariantForm(
-            parent=self,
-            db=self.db,
-            model_id=self.model_id
+        log_debug("🚀 ВЫЗВАН add_variant()")
+        log_debug(f"🎯 VariantsListDialog.add_variant: передаем model_id={self.model_id}")
+
+        from ui.references.model_specification_form_v5 import ModelSpecificationFormV5
+
+        dialog = ModelSpecificationFormV5(
+            model_id=self.model_id,
+            is_variant=True,  # Новый вариант всегда является специфическим вариантом
+            parent=self
         )
         dialog.saved.connect(self.load_variants)
         dialog.exec()
 
     def edit_variant(self):
         """Редактировать выбранный вариант"""
+        from debug_logger import log_debug
+
         current_row = self.table.currentRow()
         if current_row < 0:
             QMessageBox.warning(self, "Внимание", "Выберите вариант для редактирования")
             return
 
         variant_id = int(self.table.item(current_row, 0).text())
+        log_debug(f"🎯 edit_variant: получен variant_id={variant_id} из строки {current_row}")
 
         # Проверяем, базовый ли это вариант
         is_default = self.table.item(current_row, 3).text() == "✓"
+        log_debug(f"🎯 edit_variant: is_default={is_default} (значит is_variant={not is_default})")
 
-        if is_default:
-            # Для базового варианта используем основную форму модели
-            from ui.references.model_specification_form_v5 import ModelSpecificationFormV5
-            dialog = ModelSpecificationFormV5(
-                model_id=self.model_id,
-                is_variant=False,
-                parent=self
-            )
-        else:
-            # Для специфического варианта используем расширенную форму создания варианта
-            from ui.references.model_specific_variant_form import ModelSpecificVariantForm
-            dialog = ModelSpecificVariantForm(
-                parent=self,
-                db=self.db,
-                model_id=self.model_id,
-                variant_id=variant_id
-            )
+        log_debug(f"🎯 edit_variant: вызываем ModelSpecificationFormV5 с model_id={self.model_id}, is_variant={not is_default}, variant_id={variant_id}")
+
+        # Для всех вариантов используем одну и ту же форму
+        from ui.references.model_specification_form_v5 import ModelSpecificationFormV5
+        dialog = ModelSpecificationFormV5(
+            model_id=self.model_id,  # ID базовой модели
+            is_variant=not is_default,  # True для специфического варианта, False для базового
+            variant_id=variant_id,  # ID конкретного варианта для редактирования
+            parent=self
+        )
 
         dialog.saved.connect(self.load_variants)
         dialog.exec()
@@ -201,13 +209,15 @@ class VariantsListDialog(QDialog):
 
         variant_id = int(self.table.item(current_row, 0).text())
 
-        from ui.references.model_specific_variant_form import ModelSpecificVariantForm
-        dialog = ModelSpecificVariantForm(
-            parent=self,
-            db=self.db,
-            model_id=self.model_id,
-            variant_id=variant_id,
-            read_only=True
+        # Проверяем, базовый ли это вариант
+        is_default = self.table.item(current_row, 3).text() == "✓"
+
+        from ui.references.model_specification_form_v5 import ModelSpecificationFormV5
+        dialog = ModelSpecificationFormV5(
+            model_id=self.model_id,  # ID базовой модели
+            is_variant=not is_default,  # True для специфического варианта, False для базового
+            variant_id=variant_id,  # ID конкретного варианта для просмотра
+            parent=self
         )
         dialog.exec()
 

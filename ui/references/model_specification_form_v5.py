@@ -21,12 +21,29 @@ class ModelSpecificationFormV5(QDialog):
 
     saved = pyqtSignal()
 
-    def __init__(self, model_id=None, is_variant=False, parent=None):
+    def __init__(self, model_id=None, is_variant=False, variant_id=None, parent=None):
         super().__init__(parent)
+        from debug_logger import log_debug
+
+        log_debug(f"🏗️ ModelSpecificationFormV5 INIT: model_id={model_id}, is_variant={is_variant}, variant_id={variant_id}")
         self.model_id = model_id
         self.is_variant = is_variant  # Флаг: базовая модель или специфический вариант
+        log_debug(f"🏗️ После установки: self.model_id={self.model_id}")
         self.base_model_id = None  # ID базовой модели для вариантов
         self.base_model_data = None  # Данные базовой модели
+        self.specification_id = variant_id  # ID спецификации для редактирования существующего варианта
+        log_debug(f"🏗️ self.specification_id установлен в: {self.specification_id}")
+
+        # ВАЖНАЯ ПРОВЕРКА: variant_id должен быть передан для редактирования вариантов
+        if is_variant and variant_id:
+            log_debug(f"✅ ХОРОШО: Для редактирования варианта получен variant_id={variant_id}")
+        elif is_variant and not variant_id:
+            if model_id:
+                log_debug(f"ℹ️ СОЗДАНИЕ: Создание нового варианта для базовой модели model_id={model_id}")
+            else:
+                log_debug(f"❌ ОШИБКА: is_variant=True но variant_id=None и model_id=None")
+        else:
+            log_debug(f"ℹ️ БАЗОВАЯ МОДЕЛЬ: Работа с базовой моделью model_id={model_id}")
         self.db = DatabaseConnection()
 
         # Справочники
@@ -46,12 +63,25 @@ class ModelSpecificationFormV5(QDialog):
         self.setup_ui()
         self.load_reference_data()
 
-        if model_id:
-            self.load_model_data()
+        from debug_logger import log_debug
 
-        # Загружаем данные базовой модели для вариантов
-        if self.is_variant and hasattr(self, 'base_model_id') and self.base_model_id:
-            self.load_base_model_data()
+        log_debug(f"🔍 Перед загрузкой данных: self.model_id={self.model_id}, is_variant={self.is_variant}, variant_id={variant_id}")
+
+        # Загружаем данные для редактирования существующего варианта
+        if self.is_variant and variant_id:
+            log_debug("📝 Ветка: Редактирование существующего варианта")
+            self.load_variant_for_editing(variant_id)
+        elif self.is_variant and model_id and not variant_id:
+            # Новый вариант - загружаем данные базовой модели
+            log_debug(f"🔄 Ветка: Создание нового варианта для базовой модели ID={model_id}")
+            log_debug(f"📊 Текущие значения: self.model_id={self.model_id}, self.specification_id={self.specification_id}")
+            self.load_base_model_data(model_id)
+        elif model_id and not self.is_variant:
+            # Редактирование базовой модели (НЕ создание варианта!)
+            log_debug(f"🔄 Ветка: Редактирование базовой модели ID={model_id}")
+            self.load_model_data()
+        else:
+            log_debug(f"❓ Неопределенная ветка: model_id={model_id}, is_variant={self.is_variant}, variant_id={variant_id}")
 
     def setup_ui(self):
         """Настройка интерфейса"""
@@ -82,35 +112,54 @@ class ModelSpecificationFormV5(QDialog):
         header_layout.addWidget(QLabel("Артикул:"), 0, 2)
         header_layout.addWidget(self.article_input, 0, 3)
 
+        # Поля для варианта (показываются только для вариантов)
+        self.variant_name_label = QLabel("Название варианта:")
+        self.variant_name_input = QLineEdit()
+        self.variant_name_input.setPlaceholderText("Например: Летняя коллекция")
+        header_layout.addWidget(self.variant_name_label, 1, 0)
+        header_layout.addWidget(self.variant_name_input, 1, 1)
+
+        self.variant_article_label = QLabel("Код варианта:")
+        self.variant_article_input = QLineEdit()
+        self.variant_article_input.setPlaceholderText("VAR-001")
+        header_layout.addWidget(self.variant_article_label, 1, 2)
+        header_layout.addWidget(self.variant_article_input, 1, 3)
+
+        # Изначально скрываем поля варианта
+        self.variant_name_label.setVisible(False)
+        self.variant_name_input.setVisible(False)
+        self.variant_article_label.setVisible(False)
+        self.variant_article_input.setVisible(False)
+
         # Колодка
         self.last_code_input = QLineEdit()
         self.last_code_input.setPlaceholderText("Например: 75")
-        header_layout.addWidget(QLabel("Колодка:"), 1, 0)
-        header_layout.addWidget(self.last_code_input, 1, 1)
+        header_layout.addWidget(QLabel("Колодка:"), 2, 0)
+        header_layout.addWidget(self.last_code_input, 2, 1)
 
         self.last_type_combo = QComboBox()
         self.last_type_combo.addItems(["Ботиночная", "Туфельная", "Сапожная", "Спортивная"])
-        header_layout.addWidget(QLabel("Тип колодки:"), 1, 2)
-        header_layout.addWidget(self.last_type_combo, 1, 3)
+        header_layout.addWidget(QLabel("Тип колодки:"), 2, 2)
+        header_layout.addWidget(self.last_type_combo, 2, 3)
 
         # Размерный ряд
         self.size_min_spin = QSpinBox()
         self.size_min_spin.setRange(20, 50)
         self.size_min_spin.setValue(36)
-        header_layout.addWidget(QLabel("Размер от:"), 2, 0)
-        header_layout.addWidget(self.size_min_spin, 2, 1)
+        header_layout.addWidget(QLabel("Размер от:"), 3, 0)
+        header_layout.addWidget(self.size_min_spin, 3, 1)
 
         self.size_max_spin = QSpinBox()
         self.size_max_spin.setRange(20, 50)
         self.size_max_spin.setValue(48)
-        header_layout.addWidget(QLabel("Размер до:"), 2, 2)
-        header_layout.addWidget(self.size_max_spin, 2, 3)
+        header_layout.addWidget(QLabel("Размер до:"), 3, 2)
+        header_layout.addWidget(self.size_max_spin, 3, 3)
 
         # Тип затяжки
         self.lasting_combo = QComboBox()
         self.lasting_combo.addItem("Не выбрано", None)
-        header_layout.addWidget(QLabel("Тип затяжки:"), 3, 0)
-        header_layout.addWidget(self.lasting_combo, 3, 1)
+        header_layout.addWidget(QLabel("Тип затяжки:"), 4, 0)
+        header_layout.addWidget(self.lasting_combo, 4, 1)
 
         layout.addWidget(header_group)
 
@@ -147,6 +196,47 @@ class ModelSpecificationFormV5(QDialog):
         buttons_layout.addWidget(self.cancel_btn)
 
         main_layout.addLayout(buttons_layout)
+
+        # Первичная настройка видимости без заполнения полей (заполнение произойдет после загрузки данных)
+        if self.is_variant:
+            # Показываем поля для варианта
+            self.variant_name_label.setVisible(True)
+            self.variant_name_input.setVisible(True)
+            self.variant_article_label.setVisible(True)
+            self.variant_article_input.setVisible(True)
+        else:
+            # Скрываем поля для варианта
+            self.variant_name_label.setVisible(False)
+            self.variant_name_input.setVisible(False)
+            self.variant_article_label.setVisible(False)
+            self.variant_article_input.setVisible(False)
+
+    def setup_field_visibility(self):
+        """Настройка видимости полей в зависимости от режима (базовая модель vs вариант)"""
+        from debug_logger import log_debug
+
+        if self.is_variant:
+            # Показываем поля для варианта
+            self.variant_name_label.setVisible(True)
+            self.variant_name_input.setVisible(True)
+            self.variant_article_label.setVisible(True)
+            self.variant_article_input.setVisible(True)
+
+            # Заполняем название варианта по умолчанию если это новый вариант
+            current_text = self.variant_name_input.text()
+            if not self.specification_id and (not current_text or current_text == "Новый вариант"):
+                model_name = self.name_input.text()
+                default_name = f"{model_name} - Вариант" if model_name else "Новый вариант"
+                log_debug(f"🏷️ setup_field_visibility: model_name='{model_name}', updating variant name from '{current_text}' to '{default_name}'")
+                self.variant_name_input.setText(default_name)
+            else:
+                log_debug(f"🏷️ setup_field_visibility: не заполняем поле (specification_id={self.specification_id}, current_text='{current_text}')")
+        else:
+            # Скрываем поля для варианта
+            self.variant_name_label.setVisible(False)
+            self.variant_name_input.setVisible(False)
+            self.variant_article_label.setVisible(False)
+            self.variant_article_input.setVisible(False)
 
     def create_parameters_tab(self):
         """Создание вкладки параметров модели"""
@@ -190,6 +280,11 @@ class ModelSpecificationFormV5(QDialog):
             self.perforation_table.setColumnCount(2)
             self.perforation_table.setHorizontalHeaderLabels(["Название", "Описание"])
             self.perforation_table.horizontalHeader().setStretchLastSection(True)
+
+            # Настройки высоты строк для предотвращения наложения
+            self.perforation_table.verticalHeader().setDefaultSectionSize(35)
+            self.perforation_table.verticalHeader().setMinimumSectionSize(35)
+
             perf_layout.addWidget(self.perforation_table)
             layout.addWidget(perf_group)
 
@@ -213,6 +308,11 @@ class ModelSpecificationFormV5(QDialog):
             self.lining_table.setColumnCount(2)
             self.lining_table.setHorizontalHeaderLabels(["Название", "Описание"])
             self.lining_table.horizontalHeader().setStretchLastSection(True)
+
+            # Настройки высоты строк для предотвращения наложения
+            self.lining_table.verticalHeader().setDefaultSectionSize(35)
+            self.lining_table.verticalHeader().setMinimumSectionSize(35)
+
             lining_layout.addWidget(self.lining_table)
             layout.addWidget(lining_group)
 
@@ -277,6 +377,10 @@ class ModelSpecificationFormV5(QDialog):
 
         header.resizeSection(1, 100)
         header.resizeSection(2, 100)
+
+        # Настройки высоты строк для предотвращения наложения
+        self.hardware_table.verticalHeader().setDefaultSectionSize(35)
+        self.hardware_table.verticalHeader().setMinimumSectionSize(35)
 
         hardware_layout.addWidget(self.hardware_table)
         layout.addWidget(hardware_group)
@@ -455,6 +559,10 @@ class ModelSpecificationFormV5(QDialog):
         cutting_header.resizeSection(1, 100)
         cutting_header.resizeSection(2, 120)
 
+        # Настройки высоты строк для предотвращения наложения
+        self.cutting_table.verticalHeader().setDefaultSectionSize(35)
+        self.cutting_table.verticalHeader().setMinimumSectionSize(35)
+
         cutting_layout.addWidget(self.cutting_table)
         layout.addWidget(cutting_group)
 
@@ -489,6 +597,10 @@ class ModelSpecificationFormV5(QDialog):
         soles_header.resizeSection(1, 120)
         soles_header.resizeSection(3, 130)
         soles_header.resizeSection(4, 140)
+
+        # Настройки высоты строк для предотвращения наложения
+        self.soles_table.verticalHeader().setDefaultSectionSize(35)
+        self.soles_table.verticalHeader().setMinimumSectionSize(35)
 
         soles_layout.addWidget(self.soles_table)
         layout.addWidget(soles_group)
@@ -582,6 +694,11 @@ class ModelSpecificationFormV5(QDialog):
         self.variants_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.variants_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.variants_table.doubleClicked.connect(self.edit_variant)
+
+        # Настройки высоты строк для предотвращения наложения
+        self.variants_table.verticalHeader().setDefaultSectionSize(35)
+        self.variants_table.verticalHeader().setMinimumSectionSize(35)
+
         layout.addWidget(self.variants_table)
 
         # Кнопки
@@ -641,6 +758,18 @@ class ModelSpecificationFormV5(QDialog):
             cursor.execute("SELECT id, code, name, category FROM cutting_parts WHERE is_active = true ORDER BY category, name")
             self.cutting_parts = cursor.fetchall()
 
+            # Загружаем фурнитуру (материалы разных групп, которые могут использоваться как фурнитура)
+            cursor.execute("""
+                SELECT id, name, code FROM materials
+                WHERE (group_type = 'HARDWARE' OR name LIKE '%блочки%' OR name LIKE '%люверсы%'
+                       OR name LIKE '%крючки%' OR name LIKE '%шнурки%' OR name LIKE '%Блочки%'
+                       OR name LIKE '%Люверсы%' OR name LIKE '%Крючки%' OR name LIKE '%Шнурки%'
+                       OR code LIKE '%BLOCHKI%' OR code LIKE '%KRYUCHKI%')
+                AND is_active = true
+                ORDER BY name
+            """)
+            self.hardware_list = cursor.fetchall()
+
             # Заполняем виджеты
             if self.is_variant:
                 # Для специфического варианта - НЕ заполляем комбобоксы здесь
@@ -662,6 +791,44 @@ class ModelSpecificationFormV5(QDialog):
             # Обязательно возвращаем соединение в пул
             if conn:
                 self.db.put_connection(conn)
+
+    def load_base_model_for_variant(self, model_id):
+        """Загрузка данных базовой модели для создания/редактирования варианта"""
+        print(f"🔍 load_base_model_for_variant: model_id = {model_id}")
+
+        try:
+            conn = self.db.get_connection()
+            if not conn:
+                return
+
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            # Ищем базовую спецификацию для этой модели
+            cursor.execute("""
+                SELECT * FROM specifications
+                WHERE model_id = %s AND is_default = true
+                LIMIT 1
+            """, (model_id,))
+
+            base_spec = cursor.fetchone()
+
+            if base_spec:
+                self.base_model_data = dict(base_spec)
+                self.base_model_id = base_spec['id']
+                print(f"✅ Загружена базовая спецификация ID={self.base_model_id}")
+
+                # Загружаем опции и элементы раскроя
+                self.load_base_model_options()
+                self.load_cutting_parts_from_base_model()
+
+            else:
+                print(f"❌ Базовая спецификация для модели {model_id} не найдена")
+
+            cursor.close()
+            self.db.put_connection(conn)
+
+        except Exception as e:
+            print(f"❌ Ошибка загрузки базовой модели для варианта: {e}")
 
     def load_base_model_data(self):
         """Загрузка данных базовой модели для вариантов"""
@@ -694,7 +861,10 @@ class ModelSpecificationFormV5(QDialog):
                 # Для специфического варианта загружаем только те варианты,
                 # которые есть в базовой модели
                 if self.is_variant:
+                    from debug_logger import log_debug
+                    log_debug(f"🔧 Вызываем load_base_model_options() для варианта")
                     self.load_base_model_options()
+                    log_debug(f"🔧 Вызываем load_cutting_parts_from_base_model() для варианта")
                     # Автоматически загружаем элементы раскроя из базовой модели
                     self.load_cutting_parts_from_base_model()
             else:
@@ -708,9 +878,11 @@ class ModelSpecificationFormV5(QDialog):
 
     def load_base_model_options(self):
         """Загружает варианты только из базовой модели для комбобоксов"""
-        print(f"🔍 load_base_model_options: base_model_data = {bool(self.base_model_data)}")
+        from debug_logger import log_debug
+        log_debug(f"🔍 load_base_model_options: base_model_data = {bool(self.base_model_data)}")
+
         if not self.base_model_data:
-            print("❌ base_model_data отсутствует, выходим")
+            log_debug("❌ base_model_data отсутствует, выходим")
             return
 
         # Очищаем комбобоксы перед заполнением
@@ -720,35 +892,57 @@ class ModelSpecificationFormV5(QDialog):
         self.perforation_combo.addItem("Не выбрано", None)
         self.lining_combo.addItem("Не выбрано", None)
 
-        # Проверяем perforation_ids из базовой модели
-        perforation_ids = self.base_model_data.get('perforation_ids')
-        if perforation_ids:
-            if isinstance(perforation_ids, str):
-                try:
-                    perforation_ids = json.loads(perforation_ids)
-                except:
-                    perforation_ids = []
+        # Для вариантов заполняем ВСЕ доступные опции
+        if self.is_variant:
+            # Сначала убедимся что у нас есть reference data
+            if not hasattr(self, 'perforation_types') or not self.perforation_types:
+                log_debug("🔄 Загружаем reference data для комбобоксов варианта")
+                self.load_reference_data()
 
-            if isinstance(perforation_ids, list):
-                # Загружаем названия перфораций по ID
+            log_debug(f"🎨 Заполняем комбобоксы для варианта: перфораций={len(getattr(self, 'perforation_types', []))}, подкладок={len(getattr(self, 'lining_types', []))}")
+
+            # Заполняем ВСЕ типы перфорации (пользователь сам выберет нужный)
+            if hasattr(self, 'perforation_types'):
                 for perf_type in self.perforation_types:
-                    if perf_type['id'] in perforation_ids:
-                        self.perforation_combo.addItem(perf_type['name'], perf_type['id'])
+                    self.perforation_combo.addItem(perf_type['name'], perf_type['id'])
 
-        # Проверяем lining_ids из базовой модели
-        lining_ids = self.base_model_data.get('lining_ids')
-        if lining_ids:
-            if isinstance(lining_ids, str):
-                try:
-                    lining_ids = json.loads(lining_ids)
-                except:
-                    lining_ids = []
-
-            if isinstance(lining_ids, list):
-                # Загружаем названия подкладок по ID
+            # Заполняем ВСЕ типы подкладки
+            if hasattr(self, 'lining_types'):
                 for lining_type in self.lining_types:
-                    if lining_type['id'] in lining_ids:
-                        self.lining_combo.addItem(lining_type['name'], lining_type['id'])
+                    self.lining_combo.addItem(lining_type['name'], lining_type['id'])
+
+            log_debug(f"✅ Комбобоксы заполнены: перфорация={self.perforation_combo.count()}, подкладка={self.lining_combo.count()}")
+        else:
+            # Для базовых моделей - старая логика с фильтрацией
+            # Проверяем perforation_ids из базовой модели
+            perforation_ids = self.base_model_data.get('perforation_ids') if self.base_model_data else None
+            if perforation_ids:
+                if isinstance(perforation_ids, str):
+                    try:
+                        perforation_ids = json.loads(perforation_ids)
+                    except:
+                        perforation_ids = []
+
+                if isinstance(perforation_ids, list):
+                    # Загружаем названия перфораций по ID
+                    for perf_type in self.perforation_types:
+                        if perf_type['id'] in perforation_ids:
+                            self.perforation_combo.addItem(perf_type['name'], perf_type['id'])
+
+            # Проверяем lining_ids из базовой модели
+            lining_ids = self.base_model_data.get('lining_ids') if self.base_model_data else None
+            if lining_ids:
+                if isinstance(lining_ids, str):
+                    try:
+                        lining_ids = json.loads(lining_ids)
+                    except:
+                        lining_ids = []
+
+                if isinstance(lining_ids, list):
+                    # Загружаем названия подкладок по ID
+                    for lining_type in self.lining_types:
+                        if lining_type['id'] in lining_ids:
+                            self.lining_combo.addItem(lining_type['name'], lining_type['id'])
 
     def load_cutting_parts_from_base_model(self):
         """Загружает все элементы раскроя из базовой модели в таблицу варианта"""
@@ -1135,12 +1329,12 @@ class ModelSpecificationFormV5(QDialog):
 
         # Используем ту же форму, но в режиме создания варианта
         dialog = ModelSpecificationFormV5(
-            model_id=None,  # Новый вариант
+            model_id=self.model_id,  # Передаем ID базовой модели!
             is_variant=True,  # Режим варианта
             parent=self
         )
         dialog.base_model_id = base_specification_id  # Ссылка на базовую спецификацию
-        dialog.load_base_model_data()  # Загружаем данные базовой модели и опции
+        # Не нужно вызывать load_base_model_data здесь - это происходит автоматически в конструкторе
         dialog.setWindowTitle("Создание специфического варианта модели")
         dialog.saved.connect(self.load_variants)
         dialog.exec()
@@ -1160,14 +1354,12 @@ class ModelSpecificationFormV5(QDialog):
             QMessageBox.information(self, "Информация",
                 "Базовый вариант редактируется в основных вкладках этой формы")
         else:
-            # Специфический вариант - используем форму создания варианта для редактирования
-            print(f"🔧 V5: Вызываем ИСПРАВЛЕННУЮ форму редактирования для варианта ID={variant_id}")
-            from ui.references.model_specific_variant_form import ModelSpecificVariantForm
-            dialog = ModelSpecificVariantForm(
-                parent=self,
-                db=self.db,
+            # Специфический вариант - используем ту же форму с флагом is_variant=True
+            print(f"🔧 V5: Открываем форму редактирования специфического варианта ID={variant_id}")
+            dialog = ModelSpecificationFormV5(
                 model_id=self.model_id,
-                variant_id=variant_id  # передаем ID варианта для редактирования
+                is_variant=True,
+                parent=self
             )
             dialog.saved.connect(self.load_variants)
             dialog.exec()
@@ -1181,15 +1373,12 @@ class ModelSpecificationFormV5(QDialog):
 
         variant_id = int(self.variants_table.item(current_row, 0).text())
 
-        # Используем форму создания варианта для просмотра (в режиме только чтения)
-        print(f"🔧 V5: Вызываем ИСПРАВЛЕННУЮ форму просмотра для варианта ID={variant_id}")
-        from ui.references.model_specific_variant_form import ModelSpecificVariantForm
-        dialog = ModelSpecificVariantForm(
-            parent=self,
-            db=self.db,
+        # Используем ту же форму для просмотра варианта
+        print(f"🔧 V5: Открываем форму просмотра варианта ID={variant_id}")
+        dialog = ModelSpecificationFormV5(
             model_id=self.model_id,
-            variant_id=variant_id,  # передаем ID варианта для просмотра
-            read_only=True  # режим только для чтения
+            is_variant=True,
+            parent=self
         )
         dialog.exec()
 
@@ -1318,43 +1507,52 @@ class ModelSpecificationFormV5(QDialog):
         try:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-            # Загружаем основные данные модели
-            cursor.execute("""
-                SELECT * FROM models WHERE id = %s
-            """, (self.model_id,))
-            model = cursor.fetchone()
+            # Если редактируем вариант, основные данные модели уже загружены
+            # Загружаем основные данные модели только для новых или базовых моделей
+            if not self.specification_id:
+                cursor.execute("""
+                    SELECT * FROM models WHERE id = %s
+                """, (self.model_id,))
+                model = cursor.fetchone()
 
-            if model:
-                # Заполняем основные поля
-                self.name_input.setText(model['name'] or '')
-                self.article_input.setText(model['article'] or '')
-                self.last_code_input.setText(model['last_code'] or '')
+                if model:
+                    # Заполняем основные поля
+                    self.name_input.setText(model['name'] or '')
+                    self.article_input.setText(model['article'] or '')
+                    self.last_code_input.setText(model['last_code'] or '')
 
-                # Тип колодки
-                if model['last_type']:
-                    index = self.last_type_combo.findText(model['last_type'])
-                    if index >= 0:
-                        self.last_type_combo.setCurrentIndex(index)
+                    # Тип колодки
+                    if model['last_type']:
+                        index = self.last_type_combo.findText(model['last_type'])
+                        if index >= 0:
+                            self.last_type_combo.setCurrentIndex(index)
 
-                # Размерный ряд
-                if model['size_min']:
-                    self.size_min_spin.setValue(model['size_min'])
-                if model['size_max']:
-                    self.size_max_spin.setValue(model['size_max'])
+                    # Размерный ряд
+                    if model['size_min']:
+                        self.size_min_spin.setValue(model['size_min'])
+                    if model['size_max']:
+                        self.size_max_spin.setValue(model['size_max'])
 
-                # Тип затяжки
-                if model.get('lasting_type_id'):
-                    index = self.lasting_combo.findData(model['lasting_type_id'])
-                    if index >= 0:
-                        self.lasting_combo.setCurrentIndex(index)
+                    # Тип затяжки
+                    if model.get('lasting_type_id'):
+                        index = self.lasting_combo.findData(model['lasting_type_id'])
+                        if index >= 0:
+                            self.lasting_combo.setCurrentIndex(index)
 
             # Загружаем данные из specifications (детали кроя, фурнитура и т.д.)
-            cursor.execute("""
-                SELECT * FROM specifications
-                WHERE model_id = %s AND is_default = true
-                ORDER BY created_at DESC
-                LIMIT 1
-            """, (self.model_id,))
+            if self.specification_id:
+                # Для редактирования конкретной спецификации
+                cursor.execute("""
+                    SELECT * FROM specifications WHERE id = %s
+                """, (self.specification_id,))
+            else:
+                # Для базовой модели ищем по умолчанию
+                cursor.execute("""
+                    SELECT * FROM specifications
+                    WHERE model_id = %s AND is_default = true
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (self.model_id,))
             spec = cursor.fetchone()
 
             if spec:
@@ -1537,8 +1735,455 @@ class ModelSpecificationFormV5(QDialog):
             if conn:
                 self.db.put_connection(conn)
 
+    def load_variant_for_editing(self, variant_id):
+        """Загрузка данных конкретного варианта для редактирования"""
+        conn = self.db.get_connection()
+        if not conn:
+            return
+
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            # Загружаем спецификацию варианта
+            cursor.execute("""
+                SELECT s.*, m.name as model_name, m.article as model_article,
+                       m.id as actual_model_id, m.last_code, m.last_type,
+                       m.size_min, m.size_max
+                FROM specifications s
+                JOIN models m ON s.model_id = m.id
+                WHERE s.id = %s
+            """, (variant_id,))
+
+            variant = cursor.fetchone()
+            if variant:
+                from debug_logger import log_debug
+                log_debug(f"🔍 НАЙДЕН ВАРИАНТ: ID={variant_id}, model_id={variant['actual_model_id']}, name={variant['variant_name']}")
+
+                # Устанавливаем правильный model_id (ID базовой модели)
+                self.model_id = variant['actual_model_id']
+                log_debug(f"🔍 Обновлен model_id: {self.model_id}")
+
+                # Заполняем основную информацию из модели
+                self.name_input.setText(variant['model_name'] or '')
+                self.article_input.setText(variant['model_article'] or '')
+                self.last_code_input.setText(variant['last_code'] or '')
+
+                # Тип колодки
+                if variant['last_type']:
+                    index = self.last_type_combo.findText(variant['last_type'])
+                    if index >= 0:
+                        self.last_type_combo.setCurrentIndex(index)
+
+                # Размерный ряд
+                if variant['size_min']:
+                    self.size_min_spin.setValue(variant['size_min'])
+                if variant['size_max']:
+                    self.size_max_spin.setValue(variant['size_max'])
+
+                # Заполняем поля варианта
+                if hasattr(self, 'variant_name_input'):
+                    self.variant_name_input.setText(variant['variant_name'] or '')
+                if hasattr(self, 'variant_article_input'):
+                    self.variant_article_input.setText(variant['variant_code'] or '')
+
+                log_debug(f"🔄 Загружаем вариант ID={variant_id} для модели ID={self.model_id}")
+
+                # ВАЖНО: Загружаем данные спецификации варианта (фурнитура, детали кроя, подошвы)
+                log_debug(f"🔧 РЕДАКТИРОВАНИЕ ВАРИАНТА: загружаем спецификацию ID={variant_id}")
+
+                # Сначала загружаем справочные данные для комбобоксов
+                if not hasattr(self, 'hardware_list') or not self.hardware_list:
+                    log_debug("🔄 Загружаем reference data для редактирования варианта")
+                    self.load_reference_data()
+
+                # ВАЖНО: Заполняем комбобоксы перфорации и подкладки для вариантов
+                log_debug("🎨 Заполняем комбобоксы перфорации и подкладки для существующего варианта")
+
+                # Очищаем комбобоксы
+                self.perforation_combo.clear()
+                self.lining_combo.clear()
+
+                self.perforation_combo.addItem("Не выбрано", None)
+                self.lining_combo.addItem("Не выбрано", None)
+
+                # Заполняем ВСЕ доступные варианты
+                if hasattr(self, 'perforation_types'):
+                    log_debug(f"🎨 Заполняем перфорацию: {len(self.perforation_types)} типов")
+                    for perf_type in self.perforation_types:
+                        self.perforation_combo.addItem(perf_type['name'], perf_type['id'])
+                        log_debug(f"  + {perf_type['name']} (ID={perf_type['id']})")
+
+                if hasattr(self, 'lining_types'):
+                    log_debug(f"🎨 Заполняем подкладку: {len(self.lining_types)} типов")
+                    for lining_type in self.lining_types:
+                        self.lining_combo.addItem(lining_type['name'], lining_type['id'])
+                        log_debug(f"  + {lining_type['name']} (ID={lining_type['id']})")
+
+                log_debug(f"✅ Combo boxes заполнены для варианта: перфорация={self.perforation_combo.count()}, подкладка={self.lining_combo.count()}")
+                log_debug(f"✅ Комбобоксы включены: перфорация={self.perforation_combo.isEnabled()}, подкладка={self.lining_combo.isEnabled()}")
+
+                # Теперь загружаем данные спецификации
+                self.load_specification_data(variant)
+                log_debug(f"✅ Спецификация варианта ID={variant_id} загружена")
+
+                # Настраиваем видимость полей для режима варианта
+                self.setup_field_visibility()
+
+            cursor.close()
+        except Exception as e:
+            print(f"❌ Ошибка загрузки варианта: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки варианта: {e}")
+        finally:
+            if conn:
+                self.db.put_connection(conn)
+
+    def load_base_model_data(self, base_model_id):
+        """Загрузка данных базовой модели для создания нового варианта"""
+        from debug_logger import log_debug
+
+        log_debug(f"🔧 load_base_model_data вызван с base_model_id={base_model_id}")
+
+        conn = self.db.get_connection()
+        if not conn:
+            return
+
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            # Загружаем данные базовой модели
+            cursor.execute("""
+                SELECT * FROM models WHERE id = %s
+            """, (base_model_id,))
+            model = cursor.fetchone()
+
+            if model:
+                # ВАЖНО: сохраняем model_id для использования при сохранении
+                self.model_id = base_model_id
+
+                # Заполняем основную информацию из модели
+                self.name_input.setText(model['name'] or '')
+                self.article_input.setText(model['article'] or '')
+                self.last_code_input.setText(model['last_code'] or '')
+
+                # Тип колодки
+                if model['last_type']:
+                    index = self.last_type_combo.findText(model['last_type'])
+                    if index >= 0:
+                        self.last_type_combo.setCurrentIndex(index)
+
+                # Размерный ряд
+                if model['size_min']:
+                    self.size_min_spin.setValue(model['size_min'])
+                if model['size_max']:
+                    self.size_max_spin.setValue(model['size_max'])
+
+                log_debug(f"🔄 Загружаем данные базовой модели ID={base_model_id} для нового варианта")
+                log_debug(f"✅ model_id установлен: {self.model_id}")
+
+                # Загружаем базовую спецификацию модели
+                cursor.execute("""
+                    SELECT * FROM specifications
+                    WHERE model_id = %s AND is_default = true
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (base_model_id,))
+
+                base_spec = cursor.fetchone()
+                if base_spec:
+                    log_debug(f"✅ Найдена базовая спецификация ID={base_spec['id']}")
+
+                    # Для вариантов СНАЧАЛА заполняем combo boxes всеми доступными опциями
+                    if self.is_variant:
+                        log_debug("🔧 Заполняем combo boxes для варианта перед загрузкой спецификации")
+
+                        # Убедимся что у нас есть reference data
+                        if not hasattr(self, 'perforation_types') or not self.perforation_types:
+                            log_debug("🔄 Загружаем reference data для combo boxes")
+                            self.load_reference_data()
+
+                        # Очищаем комбобоксы
+                        self.perforation_combo.clear()
+                        self.lining_combo.clear()
+
+                        self.perforation_combo.addItem("Не выбрано", None)
+                        self.lining_combo.addItem("Не выбрано", None)
+
+                        # Заполняем ВСЕ доступные варианты
+                        if hasattr(self, 'perforation_types'):
+                            log_debug(f"🎨 Заполняем перфорацию: {len(self.perforation_types)} типов")
+                            for perf_type in self.perforation_types:
+                                self.perforation_combo.addItem(perf_type['name'], perf_type['id'])
+                                log_debug(f"  + {perf_type['name']} (ID={perf_type['id']})")
+
+                        if hasattr(self, 'lining_types'):
+                            log_debug(f"🎨 Заполняем подкладку: {len(self.lining_types)} типов")
+                            for lining_type in self.lining_types:
+                                self.lining_combo.addItem(lining_type['name'], lining_type['id'])
+                                log_debug(f"  + {lining_type['name']} (ID={lining_type['id']})")
+
+                        log_debug(f"✅ Combo boxes заполнены: перфорация={self.perforation_combo.count()}, подкладка={self.lining_combo.count()}")
+                        log_debug(f"✅ Комбобоксы включены: перфорация={self.perforation_combo.isEnabled()}, подкладка={self.lining_combo.isEnabled()}")
+
+                    # Теперь загружаем данные из базовой спецификации
+                    self.load_specification_data(base_spec)
+                else:
+                    log_debug(f"⚠️ Базовая спецификация для модели ID={base_model_id} не найдена")
+
+            cursor.close()
+
+            # Финальная проверка
+            log_debug(f"🏁 После загрузки базовой модели: self.model_id={self.model_id}")
+
+            # Настраиваем поля варианта после загрузки данных базовой модели
+            self.setup_field_visibility()
+
+        except Exception as e:
+            print(f"❌ Ошибка загрузки базовой модели: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки базовой модели: {e}")
+        finally:
+            if conn:
+                self.db.put_connection(conn)
+
+    def load_specification_data(self, spec):
+        """Загрузка данных спецификации (общий метод)"""
+        from debug_logger import log_debug
+
+        if not spec:
+            log_debug("⚠️ Спецификация пуста")
+            return
+
+        log_debug(f"📋 Загружаем спецификацию ID={spec.get('id', 'Unknown')}, variant_name={spec.get('variant_name', 'Unknown')}")
+
+        # Загружаем детали кроя
+        if spec.get('cutting_parts'):
+            cutting_parts_data = spec['cutting_parts']
+            print(f"🔧 Найдены детали кроя: {type(cutting_parts_data)}")
+
+            self.cutting_table.setRowCount(0)
+
+            # Если это строка JSON, декодируем
+            if isinstance(cutting_parts_data, str):
+                try:
+                    import json
+                    cutting_parts_data = json.loads(cutting_parts_data)
+                except json.JSONDecodeError:
+                    cutting_parts_data = []
+
+            for part in cutting_parts_data:
+                row = self.cutting_table.rowCount()
+                self.cutting_table.insertRow(row)
+
+                # Название детали как QTableWidgetItem
+                item_name = QTableWidgetItem(part.get('name', ''))
+                if part.get('id'):
+                    item_name.setData(Qt.ItemDataRole.UserRole, part['id'])
+                self.cutting_table.setItem(row, 0, item_name)
+
+                # Количество как SpinBox
+                qty_spin = QSpinBox()
+                qty_spin.setRange(1, 100)
+                qty_spin.setValue(part.get('quantity', 1))
+                self.cutting_table.setCellWidget(row, 1, qty_spin)
+
+                # Расход (дм²) как DoubleSpinBox
+                consumption_spin = QDoubleSpinBox()
+                consumption_spin.setRange(0.1, 999.9)
+                consumption_spin.setValue(part.get('consumption', 1.0))
+                consumption_spin.setDecimals(1)
+                consumption_spin.setSuffix(" дм²")
+                self.cutting_table.setCellWidget(row, 2, consumption_spin)
+
+                # Материал и примечание
+                self.cutting_table.setItem(row, 3, QTableWidgetItem(part.get('material', 'Кожа/Замша')))
+                self.cutting_table.setItem(row, 4, QTableWidgetItem(part.get('notes', '')))
+        else:
+            print("⚠️ Детали кроя отсутствуют в спецификации")
+
+        # Загружаем фурнитуру
+        if spec.get('hardware'):
+            from debug_logger import log_debug
+            log_debug("🔧 Загружаем фурнитуру для варианта")
+
+            # Для вариантов убедимся, что hardware_list заполнен
+            if self.is_variant and (not hasattr(self, 'hardware_list') or not self.hardware_list):
+                log_debug("🔄 Загружаем hardware_list для варианта")
+                self.load_reference_data()
+
+            self.hardware_table.setRowCount(0)
+            hardware_data = spec['hardware']
+            if isinstance(hardware_data, str):
+                try:
+                    import json
+                    hardware_data = json.loads(hardware_data)
+                except json.JSONDecodeError:
+                    hardware_data = []
+
+            log_debug(f"🔧 Найдено фурнитуры в спецификации: {len(hardware_data)} шт.")
+            log_debug(f"🔧 В hardware_list доступно: {len(getattr(self, 'hardware_list', []))} вариантов")
+            log_debug(f"🔧 Фурнитура варианта: {[hw.get('name', hw.get('material_name', 'Unknown')) for hw in hardware_data]}")
+
+            for hw in hardware_data:
+                row = self.hardware_table.rowCount()
+                self.hardware_table.insertRow(row)
+
+                # Фурнитура как ComboBox
+                hw_combo = QComboBox()
+                hw_combo.addItem("Выберите фурнитуру")
+                for hardware_item in getattr(self, 'hardware_list', []):
+                    hw_combo.addItem(f"{hardware_item['name']} ({hardware_item['code']})", hardware_item['id'])
+
+                # Устанавливаем текущий элемент если найден
+                current_text = hw.get('name', '')
+                log_debug(f"🔧 Ищем фурнитуру '{current_text}' в комбобоксе с {hw_combo.count()} элементами")
+                index = hw_combo.findText(current_text, Qt.MatchFlag.MatchContains)
+                if index >= 0:
+                    hw_combo.setCurrentIndex(index)
+                    log_debug(f"✅ Установлена фурнитура '{current_text}' на index={index}")
+                else:
+                    log_debug(f"❌ Фурнитура '{current_text}' НЕ НАЙДЕНА в комбобоксе")
+                    for i in range(hw_combo.count()):
+                        log_debug(f"  [{i}] {hw_combo.itemText(i)}")
+
+                self.hardware_table.setCellWidget(row, 0, hw_combo)
+
+                # Количество
+                qty_spin = QSpinBox()
+                qty_spin.setRange(1, 100)
+                qty_spin.setValue(hw.get('quantity', 1))
+                self.hardware_table.setCellWidget(row, 1, qty_spin)
+
+                # Единица измерения
+                unit_combo = QComboBox()
+                unit_combo.addItems(["шт", "пара", "м", "см"])
+                unit_text = hw.get('unit', 'шт')
+                unit_index = unit_combo.findText(unit_text)
+                if unit_index >= 0:
+                    unit_combo.setCurrentIndex(unit_index)
+                self.hardware_table.setCellWidget(row, 2, unit_combo)
+
+                # Примечание
+                self.hardware_table.setItem(row, 3, QTableWidgetItem(hw.get('notes', '')))
+
+        # Загружаем подошвы
+        if spec.get('soles'):
+            soles_data = spec['soles']
+            if isinstance(soles_data, str):
+                try:
+                    import json
+                    soles_data = json.loads(soles_data)
+                except (json.JSONDecodeError, TypeError):
+                    soles_data = []
+
+            if soles_data:
+                self.soles_table.setRowCount(0)
+                for sole in soles_data:
+                    row = self.soles_table.rowCount()
+                    self.soles_table.insertRow(row)
+
+                    material_item = QTableWidgetItem(sole.get('material', ''))
+                    if sole.get('material_id'):
+                        material_item.setData(Qt.ItemDataRole.UserRole, sole['material_id'])
+
+                    self.soles_table.setItem(row, 0, material_item)
+                    self.soles_table.setItem(row, 1, QTableWidgetItem(str(sole.get('thickness', 0))))
+                    self.soles_table.setItem(row, 2, QTableWidgetItem(sole.get('color', '')))
+                    self.soles_table.setItem(row, 3, QTableWidgetItem(str(sole.get('heel_height', 0))))
+                    self.soles_table.setItem(row, 4, QTableWidgetItem(str(sole.get('platform_height', 0))))
+
+        # Загружаем данные перфорации и подкладки
+        from debug_logger import log_debug
+
+        # Для варианта устанавливаем одиночные значения в комбобоксы
+        if self.is_variant:
+            log_debug("🎨 Загружаем перфорацию и подкладку для варианта")
+
+            # Сначала проверяем одиночные значения (для редактирования существующего варианта)
+            if spec.get('perforation_id'):
+                perforation_id = spec['perforation_id']
+                log_debug(f"🎨 Найдена перфорация ID={perforation_id}")
+                index = self.perforation_combo.findData(perforation_id)
+                if index >= 0:
+                    self.perforation_combo.setCurrentIndex(index)
+                    log_debug(f"✅ Установлена перфорация index={index}")
+            # Если нет одиночного значения, берем первый элемент из массива (для нового варианта)
+            elif spec.get('perforation_ids'):
+                try:
+                    perforation_ids = spec['perforation_ids']
+                    if isinstance(perforation_ids, str):
+                        import json
+                        perforation_ids = json.loads(perforation_ids)
+                    if perforation_ids and len(perforation_ids) > 0:
+                        first_perforation = perforation_ids[0]
+                        log_debug(f"🎨 Устанавливаем первую перфорацию из массива ID={first_perforation}")
+                        log_debug(f"🔍 В комбобоксе перфорации {self.perforation_combo.count()} элементов")
+                        index = self.perforation_combo.findData(first_perforation)
+                        if index >= 0:
+                            self.perforation_combo.setCurrentIndex(index)
+                            log_debug(f"✅ Установлена перфорация из массива index={index}")
+                        else:
+                            log_debug(f"❌ Перфорация ID={first_perforation} НЕ НАЙДЕНА в комбобоксе")
+                            # Выведем все элементы комбобокса
+                            for i in range(self.perforation_combo.count()):
+                                item_data = self.perforation_combo.itemData(i)
+                                item_text = self.perforation_combo.itemText(i)
+                                log_debug(f"  [{i}] {item_text} = {item_data}")
+                except Exception as e:
+                    log_debug(f"❌ Ошибка обработки массива перфораций: {e}")
+
+            # Подкладка - аналогично
+            if spec.get('lining_id'):
+                lining_id = spec['lining_id']
+                log_debug(f"🎨 Найдена подкладка ID={lining_id}")
+                index = self.lining_combo.findData(lining_id)
+                if index >= 0:
+                    self.lining_combo.setCurrentIndex(index)
+                    log_debug(f"✅ Установлена подкладка index={index}")
+            elif spec.get('lining_ids'):
+                try:
+                    lining_ids = spec['lining_ids']
+                    if isinstance(lining_ids, str):
+                        import json
+                        lining_ids = json.loads(lining_ids)
+                    if lining_ids and len(lining_ids) > 0:
+                        first_lining = lining_ids[0]
+                        log_debug(f"🎨 Устанавливаем первую подкладку из массива ID={first_lining}")
+                        log_debug(f"🔍 В комбобоксе подкладки {self.lining_combo.count()} элементов")
+                        index = self.lining_combo.findData(first_lining)
+                        if index >= 0:
+                            self.lining_combo.setCurrentIndex(index)
+                            log_debug(f"✅ Установлена подкладка из массива index={index}")
+                        else:
+                            log_debug(f"❌ Подкладка ID={first_lining} НЕ НАЙДЕНА в комбобоксе")
+                            # Выведем все элементы комбобокса
+                            for i in range(self.lining_combo.count()):
+                                item_data = self.lining_combo.itemData(i)
+                                item_text = self.lining_combo.itemText(i)
+                                log_debug(f"  [{i}] {item_text} = {item_data}")
+                except Exception as e:
+                    log_debug(f"❌ Ошибка обработки массива подкладок: {e}")
+
+            # Тип затяжки
+            if spec.get('lasting_type_id'):
+                lasting_id = spec['lasting_type_id']
+                log_debug(f"🎨 Найден тип затяжки ID={lasting_id}")
+                index = self.lasting_combo.findData(lasting_id)
+                if index >= 0:
+                    self.lasting_combo.setCurrentIndex(index)
+                    log_debug(f"✅ Установлен тип затяжки index={index}")
+                else:
+                    log_debug(f"⚠️ Тип затяжки ID={lasting_id} не найден в комбобоксе")
+
+        else:
+            # Для базовой модели загружаем массивы в таблицы (старая логика)
+            log_debug("🎨 Загружаем перфорации и подкладки для базовой модели в таблицы")
+            # Здесь можно добавить загрузку в таблицы если нужно
+
     def save_model(self):
         """Сохранение модели"""
+        from debug_logger import log_debug
+
+        log_debug(f"💾 Начинаем сохранение: is_variant={self.is_variant}, model_id={self.model_id}, specification_id={self.specification_id}")
+
         conn = self.db.get_connection()
         if not conn:
             return
@@ -1548,18 +2193,14 @@ class ModelSpecificationFormV5(QDialog):
 
             if self.is_variant:
                 # Для варианта создаем только спецификацию, модель уже существует
-                if not self.base_model_data:
-                    QMessageBox.warning(self, "Ошибка", "Нет данных базовой модели")
+                log_debug(f"💾 Обрабатываем сохранение варианта: model_id={self.model_id}, specification_id={self.specification_id}")
+
+                if not self.model_id:
+                    log_debug(f"❌ Ошибка: model_id отсутствует")
+                    QMessageBox.warning(self, "Ошибка", f"Не указана базовая модель. model_id={self.model_id}, specification_id={self.specification_id}")
                     return
 
-                # Получаем model_id из базовой модели
-                base_model_id = self.base_model_data.get('model_id')
-                if not base_model_id:
-                    QMessageBox.warning(self, "Ошибка", "Не найден ID базовой модели")
-                    return
-
-                self.model_id = base_model_id
-                print(f"💾 Сохраняем вариант для модели ID={base_model_id}")
+                log_debug(f"💾 Сохраняем вариант для модели ID={self.model_id} (specification_id={self.specification_id})")
 
             else:
                 # Для базовой модели проверяем обязательные поля
@@ -1614,30 +2255,39 @@ class ModelSpecificationFormV5(QDialog):
             # Сохраняем параметры в спецификацию
             if self.model_id:
                 if self.is_variant:
-                    # Для варианта создаем новую спецификацию
-                    import uuid
-                    variant_name = getattr(self, 'variant_name_input', None)
-                    variant_code = getattr(self, 'variant_article_input', None)
+                    if self.specification_id:
+                        # Редактируем существующую спецификацию варианта
+                        spec_id = self.specification_id
+                        print(f"✅ Обновляем существующую спецификацию варианта ID={spec_id}")
+                    else:
+                        # Создаем новую спецификацию варианта
+                        log_debug(f"💾 Создаем новую спецификацию для варианта")
 
-                    cursor.execute("""
-                        INSERT INTO specifications (uuid, model_id, is_default, is_active,
-                                                   variant_name, variant_code, materials,
-                                                   created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        RETURNING id
-                    """, (
-                        str(uuid.uuid4()),
-                        self.model_id,
-                        False,  # Не базовая
-                        True,   # Активная
-                        variant_name.text() if variant_name else "Новый вариант",
-                        variant_code.text() if variant_code else "VAR-001",
-                        '{}'    # Пустой JSON для материалов
-                    ))
+                        import uuid
+                        variant_name = getattr(self, 'variant_name_input', None)
+                        variant_code = getattr(self, 'variant_article_input', None)
 
-                    spec_result = cursor.fetchone()
-                    spec_id = spec_result[0] if spec_result else None
-                    print(f"✅ Создана новая спецификация для варианта ID={spec_id}")
+                        log_debug(f"💾 variant_name_input: {variant_name}, variant_code_input: {variant_code}")
+
+                        cursor.execute("""
+                            INSERT INTO specifications (uuid, model_id, is_default, is_active,
+                                                       variant_name, variant_code, materials,
+                                                       created_at, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            RETURNING id
+                        """, (
+                            str(uuid.uuid4()),
+                            self.model_id,
+                            False,  # Не базовая
+                            True,   # Активная
+                            variant_name.text() if variant_name else f"{self.name_input.text()} - Вариант",
+                            variant_code.text() if variant_code else "VAR-001",
+                            '{}'    # Пустой JSON для материалов
+                        ))
+
+                        spec_result = cursor.fetchone()
+                        spec_id = spec_result[0] if spec_result else None
+                        log_debug(f"✅ Создана новая спецификация для варианта ID={spec_id}")
 
                 else:
                     # Для базовой модели получаем существующую или создаем спецификацию
@@ -1677,6 +2327,7 @@ class ModelSpecificationFormV5(QDialog):
                         # Для специфического варианта - одиночные значения в старых полях
                         perforation_id = self.perforation_combo.currentData()
                         lining_id = self.lining_combo.currentData()
+                        log_debug(f"💾 Сохраняем параметры варианта: perforation_id={perforation_id}, lining_id={lining_id}")
                         perforation_ids = None
                         lining_ids = None
                     else:
@@ -1743,20 +2394,33 @@ class ModelSpecificationFormV5(QDialog):
 
                     # Собираем данные фурнитуры из таблицы
                     hardware_data = []
+                    log_debug(f"💾 Собираем фурнитуру из таблицы: {self.hardware_table.rowCount()} строк")
+
                     for row in range(self.hardware_table.rowCount()):
                         hw_widget = self.hardware_table.cellWidget(row, 0)
                         qty_widget = self.hardware_table.cellWidget(row, 1)
                         unit_widget = self.hardware_table.cellWidget(row, 2)
                         notes_item = self.hardware_table.item(row, 3)
 
+                        log_debug(f"💾 Строка {row}: hw_widget={hw_widget is not None}, qty_widget={qty_widget is not None}, unit_widget={unit_widget is not None}")
+
                         if hw_widget:
+                            hw_name = hw_widget.currentText() if hasattr(hw_widget, 'currentText') else str(hw_widget)
+                            hw_quantity = qty_widget.value() if qty_widget else 1
+                            hw_unit = unit_widget.currentText() if unit_widget else 'шт'
+                            hw_notes = notes_item.text() if notes_item else ''
+
+                            log_debug(f"💾 Фурнитура [{row}]: {hw_name}, кол-во: {hw_quantity}, единица: {hw_unit}, примечание: '{hw_notes}'")
+
                             hardware_item = {
-                                'name': hw_widget.currentText() if hasattr(hw_widget, 'currentText') else str(hw_widget),
-                                'quantity': qty_widget.value() if qty_widget else 1,
-                                'unit': unit_widget.currentText() if unit_widget else 'шт',
-                                'notes': notes_item.text() if notes_item else ''
+                                'name': hw_name,
+                                'quantity': hw_quantity,
+                                'unit': hw_unit,
+                                'notes': hw_notes
                             }
                             hardware_data.append(hardware_item)
+                        else:
+                            log_debug(f"💾 Строка {row}: hw_widget отсутствует, пропускаем")
 
                     # Собираем данные подошв из таблицы
                     soles_data = []
@@ -1773,6 +2437,9 @@ class ModelSpecificationFormV5(QDialog):
                         soles_data.append(sole_item)
 
                     # Обновляем спецификацию с параметрами
+                    log_debug(f"💾 Выполняем UPDATE спецификации ID={spec_id}")
+                    log_debug(f"💾 Фурнитура для сохранения: {len(hardware_data)} элементов")
+
                     cursor.execute("""
                         UPDATE specifications
                         SET perforation_id = %s, lining_id = %s,
@@ -1790,13 +2457,13 @@ class ModelSpecificationFormV5(QDialog):
                           json.dumps(hardware_data) if hardware_data else None,
                           spec_id))
 
-                    print(f"✓ Сохранены параметры:")
-                    print(f"  Вариант: perforation_id={perforation_id}, lining_id={lining_id}")
-                    print(f"  Базовая модель: perforation_ids={perforation_ids}, lining_ids={lining_ids}")
-                    print(f"  Тип затяжки: lasting_type_id={lasting_type_id}")
-                    print(f"  Подошвы: {len(soles_data)} шт.")
-                    print(f"  Элементы раскроя: {len(cutting_parts_data)} шт.")
-                    print(f"  Фурнитура: {len(hardware_data)} шт.")
+                    log_debug(f"✓ Сохранены параметры:")
+                    log_debug(f"  Вариант: perforation_id={perforation_id}, lining_id={lining_id}")
+                    log_debug(f"  Базовая модель: perforation_ids={perforation_ids}, lining_ids={lining_ids}")
+                    log_debug(f"  Тип затяжки: lasting_type_id={lasting_type_id}")
+                    log_debug(f"  Подошвы: {len(soles_data)} шт.")
+                    log_debug(f"  Элементы раскроя: {len(cutting_parts_data)} шт.")
+                    log_debug(f"  Фурнитура: {len(hardware_data)} шт.")
 
                 else:
                     print("⚠️ Спецификация не найдена для модели")
@@ -1809,6 +2476,10 @@ class ModelSpecificationFormV5(QDialog):
             self.accept()
 
         except Exception as e:
+            log_debug(f"❌ Ошибка при сохранении: {e}")
+            log_debug(f"❌ Тип ошибки: {type(e).__name__}")
+            import traceback
+            log_debug(f"❌ Трейсбек: {traceback.format_exc()}")
             conn.rollback()
             QMessageBox.critical(self, "Ошибка", f"Ошибка сохранения: {e}")
         finally:
