@@ -18,13 +18,31 @@ class ModelsTableFullWidget(BaseTableWidgetV2):
         self.setWindowTitle("Модели обуви - Полная версия")
         self.db = DatabaseConnection()
 
+    def setup_ui(self):
+        """Переопределяем метод настройки UI для добавления кнопки вариантов"""
+        # Вызываем родительский метод
+        super().setup_ui()
+
+        # Теперь добавляем кнопку вариантов
+        # Находим layout панели инструментов
+        main_layout = self.layout()
+        if main_layout and main_layout.count() > 0:
+            # Первый элемент - это панель инструментов
+            toolbar_layout = main_layout.itemAt(0).layout()
+            if toolbar_layout:
+                # Добавляем кнопку для просмотра вариантов
+                self.variants_btn = QPushButton("📋 Варианты")
+                self.variants_btn.clicked.connect(self.show_variants)
+                # Вставляем кнопку после кнопки "Удалить"
+                toolbar_layout.insertWidget(4, self.variants_btn)
+
     def get_search_columns(self):
         """Колонки для поиска"""
         return ['article', 'name', 'category', 'collection', 'season']
 
     def add_record(self):
         from ui.references.model_variant_dialog import ModelVariantTypeDialog
-        from ui.references.model_specification_form_v2 import ModelSpecificationFormV2
+        from ui.references.model_specification_form_v5 import ModelSpecificationFormV5
         from ui.references.model_specific_variant_form import ModelSpecificVariantForm
 
         # Сначала спрашиваем тип модели
@@ -34,11 +52,11 @@ class ModelsTableFullWidget(BaseTableWidgetV2):
 
             if variant_type == "free":
                 # Создаем базовую модель (свободный вариант)
-                dialog = ModelSpecificationFormV2(parent=self)
+                dialog = ModelSpecificationFormV5(is_variant=False, parent=self)
                 dialog.saved.connect(self.refresh_data)
                 dialog.exec()
             else:
-                # Для специфического варианта сначала нужно выбрать базовую модель
+                # Для специфического варианта используем специализированную форму
                 model_id = self.select_base_model()
                 if model_id:
                     dialog = ModelSpecificVariantForm(parent=self, db=self.db, model_id=model_id)
@@ -96,10 +114,23 @@ class ModelsTableFullWidget(BaseTableWidgetV2):
     def edit_record(self):
         record_id = self.get_current_record_id()
         if record_id:
-            from ui.references.model_specification_form_v2 import ModelSpecificationFormV2
-            dialog = ModelSpecificationFormV2(model_id=record_id, parent=self)
+            from ui.references.model_specification_form_v5 import ModelSpecificationFormV5
+            # При редактировании определяем тип модели по наличию данных варианта
+            # TODO: определить is_variant на основе данных из БД
+            dialog = ModelSpecificationFormV5(model_id=record_id, is_variant=False, parent=self)
             dialog.saved.connect(self.refresh_data)
             dialog.exec()
+
+    def show_variants(self):
+        """Показать варианты выбранной модели"""
+        record_id = self.get_current_record_id()
+        if not record_id:
+            QMessageBox.warning(self, "Внимание", "Выберите модель для просмотра вариантов")
+            return
+
+        from ui.references.variants_list_dialog import VariantsListDialog
+        dialog = VariantsListDialog(model_id=record_id, db=self.db, parent=self)
+        dialog.exec()
 
 
 class ModelFullFormDialog(BaseFormDialog):

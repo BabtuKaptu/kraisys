@@ -25,7 +25,9 @@ def main():
         print("Starting in demo mode...")
 
     # Создаем и показываем главное окно
+    print("🔥 СОЗДАЮ MainWindow() В main.py")
     window = MainWindow()
+    print("🔥 ПОКАЗЫВАЮ window.show() В main.py")
     window.show()
 
     # Запуск приложения

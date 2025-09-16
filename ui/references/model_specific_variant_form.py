@@ -19,21 +19,31 @@ class ModelSpecificVariantForm(QDialog):
 
     saved = pyqtSignal()
 
-    def __init__(self, parent=None, db=None, model_id=None):
+    def __init__(self, parent=None, db=None, model_id=None, variant_id=None, read_only=False):
         super().__init__(parent)
         self.db = db
         self.model_id = model_id
+        self.variant_id = variant_id
+        self.read_only = read_only
         self.base_model_data = None
-        self.variant_id = None
+        self.is_editing = variant_id is not None
 
-        self.setWindowTitle("Создание специфического варианта модели")
+        if self.is_editing:
+            self.setWindowTitle("🔧 ИСПРАВЛЕННОЕ РЕДАКТИРОВАНИЕ специфического варианта модели")
+            print("🔧 ИСПРАВЛЕННАЯ форма редактирования варианта загружена!")
+        else:
+            self.setWindowTitle("🔧 ИСПРАВЛЕННОЕ СОЗДАНИЕ специфического варианта модели")
+            print("🔧 ИСПРАВЛЕННАЯ форма создания варианта загружена!")
+
         self.setModal(True)
         self.resize(1200, 700)
 
         self.init_ui()
         self.load_references()
 
-        if self.model_id:
+        if self.is_editing:
+            self.load_existing_variant()
+        elif self.model_id:
             self.load_base_model()
 
     def init_ui(self):
@@ -269,27 +279,34 @@ class ModelSpecificVariantForm(QDialog):
                     f"Размеры: {model['size_min']}-{model['size_max']}"
                 )
 
-                # Загружаем компоненты модели
+                # Загружаем данные базовой спецификации (базового варианта модели)
                 cursor.execute("""
-                    SELECT component_name, component_group, absolute_consumption, unit, notes
-                    FROM model_components
-                    WHERE model_id = %s
-                    ORDER BY sort_order
+                    SELECT cutting_parts
+                    FROM specifications
+                    WHERE model_id = %s AND is_default = true
                 """, (self.model_id,))
 
-                components = cursor.fetchall()
+                base_spec = cursor.fetchone()
+                cutting_parts = []
 
-                # Заполняем таблицу деталей кроя
-                for comp in components:
-                    if comp['component_group'] == 'cutting':
+                if base_spec and base_spec['cutting_parts']:
+                    import json
+                    try:
+                        cutting_parts = json.loads(base_spec['cutting_parts'])
+                    except:
+                        cutting_parts = []
+
+                # Заполняем таблицу деталей кроя из базовой спецификации
+                for part_data in cutting_parts:
                         row = self.cutting_table.rowCount()
                         self.cutting_table.insertRow(row)
 
                         # Деталь кроя
-                        self.cutting_table.setItem(row, 0, QTableWidgetItem(comp['component_name']))
+                        self.cutting_table.setItem(row, 0, QTableWidgetItem(part_data.get('name', '')))
 
-                        # Количество (по умолчанию пара)
-                        self.cutting_table.setItem(row, 1, QTableWidgetItem("2"))
+                        # Количество из базовой спецификации
+                        quantity = str(part_data.get('quantity', 2))
+                        self.cutting_table.setItem(row, 1, QTableWidgetItem(quantity))
 
                         # Комбобокс для выбора материала
                         material_combo = QComboBox()
@@ -305,7 +322,7 @@ class ModelSpecificVariantForm(QDialog):
                         self.cutting_table.setCellWidget(row, 2, material_combo)
 
                         # Расход
-                        consumption = comp['absolute_consumption'] if comp['absolute_consumption'] else 0
+                        consumption = part_data.get('consumption', 0)
                         self.cutting_table.setItem(row, 3, QTableWidgetItem(f"{consumption:.2f}"))
 
                         # Цена за единицу (будет заполнена при выборе материала)
@@ -314,27 +331,117 @@ class ModelSpecificVariantForm(QDialog):
                         # Стоимость (будет рассчитана)
                         self.cutting_table.setItem(row, 5, QTableWidgetItem("0.00"))
 
-                    elif comp['component_group'] == 'material':
-                        # Добавляем фурнитуру
-                        row = self.hardware_table.rowCount()
-                        self.hardware_table.insertRow(row)
-
-                        self.hardware_table.setItem(row, 0, QTableWidgetItem(comp['component_name']))
-                        quantity = comp['absolute_consumption'] if comp['absolute_consumption'] else 1
-                        self.hardware_table.setItem(row, 1, QTableWidgetItem(f"{quantity:.2f}"))
-                        self.hardware_table.setItem(row, 2, QTableWidgetItem(comp['unit'] or 'шт'))
-                        self.hardware_table.setItem(row, 3, QTableWidgetItem("0.00"))
-                        self.hardware_table.setItem(row, 4, QTableWidgetItem("0.00"))
-
-                    elif comp['component_group'] == 'sole':
-                        # Устанавливаем размерный ряд для подошвы
-                        self.sole_size_label.setText(comp['unit'] or '')
-
             cursor.close()
             self.db.put_connection(conn)
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные модели: {e}")
+
+    def load_existing_variant(self):
+        """Загрузка данных существующего варианта для редактирования"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            # Загружаем данные варианта
+            cursor.execute("""
+                SELECT s.*, m.name as model_name, m.article as model_article
+                FROM specifications s
+                JOIN models m ON s.model_id = m.id
+                WHERE s.id = %s
+            """, (self.variant_id,))
+
+            variant = cursor.fetchone()
+
+            if variant:
+                self.model_id = variant['model_id']
+
+                # Заполняем поля формы
+                self.variant_name_input.setText(variant['variant_name'] or '')
+                self.variant_code_input.setText(variant['variant_code'] or '')
+
+                # Загружаем cutting_parts
+                cutting_parts = variant.get('cutting_parts', [])
+                if isinstance(cutting_parts, str):
+                    cutting_parts = json.loads(cutting_parts) if cutting_parts else []
+
+                # Очищаем таблицу и заполняем данными варианта
+                self.cutting_table.setRowCount(0)
+                for part_data in cutting_parts:
+                    row = self.cutting_table.rowCount()
+                    self.cutting_table.insertRow(row)
+
+                    # Деталь кроя
+                    self.cutting_table.setItem(row, 0, QTableWidgetItem(part_data.get('name', '')))
+
+                    # Количество
+                    self.cutting_table.setItem(row, 1, QTableWidgetItem(str(part_data.get('quantity', 2))))
+
+                    # Комбобокс для выбора материала
+                    material_combo = QComboBox()
+                    material_combo.addItem("Выберите материал...", None)
+
+                    for mat in self.materials_list:
+                        display_text = f"{mat['code']} - {mat['name']} ({mat['material_type']})"
+                        if mat['price']:
+                            display_text += f" - {mat['price']} руб/{mat['unit']}"
+                        material_combo.addItem(display_text, mat)
+
+                        # Если это материал из данных варианта, выбираем его
+                        if ('material_id' in part_data and part_data['material_id'] == mat['id']) or \
+                           ('material_code' in part_data and part_data['material_code'] == mat['code']):
+                            material_combo.setCurrentIndex(material_combo.count() - 1)
+
+                    material_combo.currentIndexChanged.connect(self.calculate_costs)
+                    self.cutting_table.setCellWidget(row, 2, material_combo)
+
+                    # Расход
+                    consumption = part_data.get('consumption', 0)
+                    self.cutting_table.setItem(row, 3, QTableWidgetItem(f"{consumption:.2f}"))
+
+                    # Цена за единицу (будет заполнена при выборе материала)
+                    self.cutting_table.setItem(row, 4, QTableWidgetItem("0.00"))
+
+                    # Стоимость (будет рассчитана)
+                    self.cutting_table.setItem(row, 5, QTableWidgetItem("0.00"))
+
+                # Загружаем hardware
+                hardware = variant.get('hardware', [])
+                if isinstance(hardware, str):
+                    hardware = json.loads(hardware) if hardware else []
+
+                self.hardware_table.setRowCount(0)
+                for hw_data in hardware:
+                    row = self.hardware_table.rowCount()
+                    self.hardware_table.insertRow(row)
+
+                    self.hardware_table.setItem(row, 0, QTableWidgetItem(hw_data.get('name', '')))
+                    self.hardware_table.setItem(row, 1, QTableWidgetItem(str(hw_data.get('quantity', 1))))
+                    self.hardware_table.setItem(row, 2, QTableWidgetItem(hw_data.get('unit', '')))
+                    self.hardware_table.setItem(row, 3, QTableWidgetItem("0.00"))
+                    self.hardware_table.setItem(row, 4, QTableWidgetItem("0.00"))
+
+                # Загружаем подошву
+                sole = variant.get('sole')
+                if isinstance(sole, str):
+                    sole = json.loads(sole) if sole else None
+
+                if sole and isinstance(sole, dict):
+                    # Ищем подошву в комбобоксе
+                    for i in range(self.sole_combo.count()):
+                        sole_data = self.sole_combo.itemData(i)
+                        if sole_data and sole_data.get('id') == sole.get('id'):
+                            self.sole_combo.setCurrentIndex(i)
+                            break
+
+                # Пересчитываем стоимости
+                self.calculate_costs()
+
+            cursor.close()
+            conn.close()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные варианта: {e}")
 
     def calculate_costs(self):
         """Расчет стоимости материалов"""
@@ -356,7 +463,7 @@ class ModelSpecificVariantForm(QDialog):
                 self.cutting_table.setItem(row, 4, QTableWidgetItem(f"{price:.2f}"))
 
                 # Рассчитываем стоимость
-                cost = consumption * price
+                cost = float(consumption) * float(price)
                 self.cutting_table.setItem(row, 5, QTableWidgetItem(f"{cost:.2f}"))
 
                 total_cost += cost

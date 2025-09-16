@@ -15,7 +15,8 @@ class ModelVariantTypeDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Выбор типа модели")
         self.setModal(True)
-        self.setFixedSize(500, 350)
+        self.resize(500, 350)
+        self.setMinimumSize(450, 300)
 
         self.variant_type = None
         self.init_ui()
