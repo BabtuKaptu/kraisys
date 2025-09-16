@@ -1,8 +1,12 @@
 """Main window for KRAI Desktop Application"""
 print("🔥 ЗАГРУЖАЕТСЯ main_window.py - НАЧАЛО ФАЙЛА")
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QMessageBox
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import (
+    QMainWindow, QTabWidget, QMessageBox, QStatusBar, QLabel,
+    QHBoxLayout, QWidget, QVBoxLayout, QSplashScreen
+)
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
+from PyQt6.QtGui import QAction, QPixmap, QPainter, QFont
+from ui.styles.app_styles import AppStyles, AppColors, AppIcons
 print("🔥 ИМПОРТЫ main_window.py ЗАВЕРШЕНЫ")
 
 class MainWindow(QMainWindow):
@@ -11,12 +15,21 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         print("🔥 MainWindow __init__ ВЫЗВАН")
-        self.setWindowTitle("KRAI Production System")
+
+        # Настройка окна
+        self.setWindowTitle(f"{AppIcons.MODEL} KRAI Production System v0.4")
         self.setGeometry(100, 100, 1400, 900)
+        self.setMinimumSize(1200, 700)
+
+        # Применение стилей
+        self.setStyleSheet(AppStyles.get_combined_style())
+
         print("🔥 ВЫЗЫВАЮ setup_ui()")
         self.setup_ui()
         print("🔥 ВЫЗЫВАЮ setup_menu()")
         self.setup_menu()
+        print("🔥 ВЫЗЫВАЮ setup_status_bar()")
+        self.setup_status_bar()
         print("🔥 MainWindow __init__ ЗАВЕРШЕН")
 
     def setup_ui(self):
@@ -48,11 +61,11 @@ class MainWindow(QMainWindow):
         self.orders_widget = QLabel("Заказы - В разработке")
         self.orders_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Добавляем основные табы
-        self.tabs.addTab(self.models_widget, "Модели")
-        self.tabs.addTab(self.materials_widget, "Материалы")
-        self.tabs.addTab(self.stock_widget, "Склад")
-        self.tabs.addTab(self.orders_widget, "Заказы")
+        # Добавляем основные табы с иконками
+        self.tabs.addTab(self.models_widget, f"{AppIcons.MODEL} Модели")
+        self.tabs.addTab(self.materials_widget, f"{AppIcons.MATERIAL} Материалы")
+        self.tabs.addTab(self.stock_widget, f"📦 Склад")
+        self.tabs.addTab(self.orders_widget, f"📋 Заказы")
 
         # Добавляем единую вкладку справочников
         try:
@@ -69,9 +82,7 @@ class MainWindow(QMainWindow):
             error_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.tabs.addTab(error_widget, "📚 Справочники")
 
-        # Статус бар
-        self.status_bar = self.statusBar()
-        self.status_bar.showMessage("Готов к работе")
+        print("✅ Все виджеты справочников загружены")
 
     def setup_menu(self):
         menubar = self.menuBar()
@@ -125,9 +136,45 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
 
+    def setup_status_bar(self):
+        """Настройка красивого статус-бара"""
+        self.status_bar = self.statusBar()
+
+        # Основное сообщение
+        self.status_message = QLabel(f"{AppIcons.SUCCESS} Готов к работе")
+        self.status_bar.addWidget(self.status_message)
+
+        # Добавляем отступ
+        self.status_bar.addPermanentWidget(QLabel(""), 1)
+
+        # Версия приложения
+        version_label = QLabel("v0.4")
+        version_label.setStyleSheet(f"color: {AppColors.TEXT_SECONDARY}; font-size: 12px;")
+        self.status_bar.addPermanentWidget(version_label)
+
+        # Настраиваем стиль статус-бара
+        self.status_bar.setStyleSheet(f"""
+            QStatusBar {{
+                background-color: {AppColors.SURFACE};
+                color: {AppColors.TEXT_PRIMARY};
+                border-top: 1px solid {AppColors.LIGHT_GRAY};
+            }}
+            QStatusBar::item {{
+                border: none;
+            }}
+        """)
+
+    def update_status(self, message, icon=AppIcons.INFO, timeout=3000):
+        """Обновление статуса с временным сообщением"""
+        if hasattr(self, 'status_message'):
+            self.status_message.setText(f"{icon} {message}")
+            if timeout > 0:
+                QTimer.singleShot(timeout, lambda: self.status_message.setText(f"{AppIcons.SUCCESS} Готов к работе"))
+
     def show_about(self):
-        QMessageBox.about(self, "О программе",
-                         "KRAI Production System v1.0\n\n"
+        QMessageBox.about(self, f"{AppIcons.ABOUT} О программе",
+                         f"{AppIcons.MODEL} KRAI Production System v0.4\n\n"
                          "Система управления производством обуви\n"
+                         f"{AppIcons.SUCCESS} Версия 0.4 - Красивый интерфейс\n"
                          "© 2024 KRAI")
 
