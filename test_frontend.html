@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRAI Frontend Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .loading { background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>KRAI Production System Frontend Test</h1>
+
+    <div id="status" class="status loading">Testing...</div>
+
+    <h3>Backend API Test</h3>
+    <div id="api-status" class="status loading">Checking API...</div>
+    <pre id="api-response"></pre>
+
+    <h3>Frontend Response Test</h3>
+    <div id="frontend-status" class="status loading">Checking Frontend...</div>
+    <pre id="frontend-response"></pre>
+
+    <h3>Console Logs</h3>
+    <pre id="console-logs"></pre>
+
+    <script>
+        const log = (message) => {
+            console.log(message);
+            const logsElement = document.getElementById('console-logs');
+            logsElement.textContent += new Date().toISOString() + ': ' + message + '\n';
+        };
+
+        log('Starting frontend test...');
+
+        // Test API connection
+        async function testAPI() {
+            try {
+                log('Testing API connection to http://localhost:8002...');
+                const response = await fetch('http://localhost:8002/health');
+                const data = await response.json();
+
+                document.getElementById('api-status').className = 'status success';
+                document.getElementById('api-status').textContent = 'API OK: ' + data.status;
+                document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+
+                log('API test successful');
+                return true;
+            } catch (error) {
+                document.getElementById('api-status').className = 'status error';
+                document.getElementById('api-status').textContent = 'API Error: ' + error.message;
+                document.getElementById('api-response').textContent = error.toString();
+
+                log('API test failed: ' + error.message);
+                return false;
+            }
+        }
+
+        // Test frontend
+        async function testFrontend() {
+            try {
+                log('Testing frontend response from http://localhost:3001...');
+                const response = await fetch('http://localhost:3001');
+                const html = await response.text();
+
+                if (html.includes('KRAI Production System')) {
+                    document.getElementById('frontend-status').className = 'status success';
+                    document.getElementById('frontend-status').textContent = 'Frontend OK: Page loads correctly';
+                    document.getElementById('frontend-response').textContent = 'HTML length: ' + html.length + ' characters\nTitle found: ' + (html.includes('<title>') ? 'Yes' : 'No');
+                    log('Frontend test successful');
+                    return true;
+                } else {
+                    throw new Error('Expected content not found');
+                }
+            } catch (error) {
+                document.getElementById('frontend-status').className = 'status error';
+                document.getElementById('frontend-status').textContent = 'Frontend Error: ' + error.message;
+                document.getElementById('frontend-response').textContent = error.toString();
+
+                log('Frontend test failed: ' + error.message);
+                return false;
+            }
+        }
+
+        // Run tests
+        async function runTests() {
+            log('Running comprehensive tests...');
+
+            const apiOK = await testAPI();
+            const frontendOK = await testFrontend();
+
+            if (apiOK && frontendOK) {
+                document.getElementById('status').className = 'status success';
+                document.getElementById('status').textContent = 'All tests passed! System is working correctly.';
+                log('All tests completed successfully');
+
+                // Try to test models API
+                try {
+                    log('Testing models API...');
+                    const modelsResponse = await fetch('http://localhost:8002/api/v1/models/');
+                    const modelsData = await modelsResponse.json();
+                    log('Models API returned ' + modelsData.models.length + ' models');
+                } catch (error) {
+                    log('Models API test failed: ' + error.message);
+                }
+
+            } else {
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').textContent = 'Some tests failed. Check details above.';
+                log('Some tests failed');
+            }
+        }
+
+        // Auto-run tests when page loads
+        setTimeout(runTests, 1000);
+    </script>
+</body>
+</html>

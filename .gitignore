@@ -25,4 +25,6 @@ __pycache__/
 
 # OS
 .DS_Store
-Thumbs.db
+Thumbs.dbvenv/
+frontend/node_modules/
+*.log

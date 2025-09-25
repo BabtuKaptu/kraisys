@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRAI Frontend Diagnostic</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; max-height: 300px; }
+        iframe { width: 100%; height: 600px; border: 1px solid #ccc; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 KRAI Frontend Diagnostic Tool</h1>
+
+    <h2>📊 Server Status</h2>
+    <div id="servers-status" class="status info">Checking servers...</div>
+
+    <h2>🎯 API Connectivity Test</h2>
+    <div id="api-test" class="status info">Testing API...</div>
+    <pre id="api-details"></pre>
+
+    <h2>⚛️ React Application Status</h2>
+    <div id="react-status" class="status info">Loading React app...</div>
+
+    <h2>🖼️ Frontend Preview</h2>
+    <iframe id="frontend-frame" src="http://localhost:3001" title="KRAI Frontend"></iframe>
+
+    <h2>📋 Diagnostic Details</h2>
+    <pre id="diagnostic-log"></pre>
+
+    <script>
+        const log = (message, type = 'info') => {
+            const timestamp = new Date().toISOString();
+            const logElement = document.getElementById('diagnostic-log');
+            logElement.textContent += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            console.log(`[${type}] ${message}`);
+        };
+
+        // Check servers
+        async function checkServers() {
+            log('Starting server diagnostics...');
+
+            try {
+                // Check backend
+                const backendResponse = await fetch('http://localhost:8002/health');
+                const backendData = await backendResponse.json();
+                log(`Backend (8002): ${backendData.status} - v${backendData.version}`, 'success');
+
+                // Check frontend
+                const frontendResponse = await fetch('http://localhost:3001');
+                if (frontendResponse.ok) {
+                    log('Frontend (3001): Server responding', 'success');
+                } else {
+                    log(`Frontend (3001): HTTP ${frontendResponse.status}`, 'error');
+                }
+
+                document.getElementById('servers-status').className = 'status success';
+                document.getElementById('servers-status').textContent = '✅ Both servers are running';
+
+            } catch (error) {
+                log(`Server check failed: ${error.message}`, 'error');
+                document.getElementById('servers-status').className = 'status error';
+                document.getElementById('servers-status').textContent = '❌ Server connection failed';
+            }
+        }
+
+        // Test API endpoints
+        async function testAPI() {
+            const endpoints = [
+                '/api/v1/models/',
+                '/api/v1/materials/',
+                '/api/v1/warehouse/stock',
+                '/api/v1/production/orders'
+            ];
+
+            let results = {};
+
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(`http://localhost:8002${endpoint}`);
+                    const data = await response.json();
+                    results[endpoint] = {
+                        status: response.status,
+                        dataCount: Object.keys(data).length
+                    };
+                    log(`API ${endpoint}: OK (${response.status})`, 'success');
+                } catch (error) {
+                    results[endpoint] = { error: error.message };
+                    log(`API ${endpoint}: ERROR - ${error.message}`, 'error');
+                }
+            }
+
+            document.getElementById('api-details').textContent = JSON.stringify(results, null, 2);
+            document.getElementById('api-test').className = 'status success';
+            document.getElementById('api-test').textContent = '✅ API endpoints tested';
+        }
+
+        // Check React app loading
+        function checkReactApp() {
+            const iframe = document.getElementById('frontend-frame');
+
+            iframe.onload = function() {
+                setTimeout(() => {
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        const title = iframeDoc.title;
+                        const hasRoot = iframeDoc.getElementById('root') !== null;
+
+                        if (title.includes('KRAI') && hasRoot) {
+                            document.getElementById('react-status').className = 'status success';
+                            document.getElementById('react-status').textContent = '✅ React application loaded successfully';
+                            log('React app loaded successfully', 'success');
+
+                            // Check if React actually rendered content
+                            const rootContent = iframeDoc.getElementById('root').innerHTML;
+                            if (rootContent && rootContent.length > 100) {
+                                log('React content rendered in DOM', 'success');
+                            } else {
+                                log('React app loaded but content may not be rendered', 'warning');
+                            }
+                        } else {
+                            throw new Error('React app structure not found');
+                        }
+                    } catch (error) {
+                        document.getElementById('react-status').className = 'status error';
+                        document.getElementById('react-status').textContent = '❌ React app loading issue: ' + error.message;
+                        log(`React app check failed: ${error.message}`, 'error');
+                    }
+                }, 2000); // Wait 2 seconds for React to render
+            };
+
+            iframe.onerror = function() {
+                document.getElementById('react-status').className = 'status error';
+                document.getElementById('react-status').textContent = '❌ Failed to load React application';
+                log('Failed to load iframe', 'error');
+            };
+        }
+
+        // Run all diagnostics
+        async function runDiagnostics() {
+            log('🚀 Starting comprehensive frontend diagnostics...');
+
+            await checkServers();
+            await testAPI();
+            checkReactApp();
+
+            log('✅ Diagnostics completed');
+        }
+
+        // Auto-start diagnostics
+        window.addEventListener('load', () => {
+            setTimeout(runDiagnostics, 500);
+        });
+    </script>
+</body>
+</html>
