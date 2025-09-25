@@ -1,0 +1,301 @@
+{
+  "test_summary": {
+    "total_tests": 28,
+    "passed": 27,
+    "failed": 1,
+    "success_rate": 96.42857142857143,
+    "duration_seconds": 0.21674227714538574
+  },
+  "test_results": [
+    {
+      "test_name": "Backend Root Endpoint",
+      "status": "PASSED",
+      "details": {
+        "status_code": 200,
+        "version": "0.6.0",
+        "message": "KRAI Production System API v0.6"
+      },
+      "error": null,
+      "timestamp": 1758279012.660567
+    },
+    {
+      "test_name": "Backend Health Check",
+      "status": "PASSED",
+      "details": {
+        "status": "healthy",
+        "version": "0.6.0"
+      },
+      "error": null,
+      "timestamp": 1758279012.662797
+    },
+    {
+      "test_name": "API Models List",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/models/",
+        "status_code": 200,
+        "response_size": 1545
+      },
+      "error": null,
+      "timestamp": 1758279012.678862
+    },
+    {
+      "test_name": "API Models Stats",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/models/stats/summary",
+        "status_code": 200,
+        "response_size": 128
+      },
+      "error": null,
+      "timestamp": 1758279012.681356
+    },
+    {
+      "test_name": "API Materials List",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/materials/",
+        "status_code": 200,
+        "response_size": 1470
+      },
+      "error": null,
+      "timestamp": 1758279012.6838
+    },
+    {
+      "test_name": "API Materials Stats",
+      "status": "FAILED",
+      "details": {
+        "endpoint": "/api/v1/materials/stats/summary",
+        "status_code": 500,
+        "response": "Internal Server Error"
+      },
+      "error": null,
+      "timestamp": 1758279012.710447
+    },
+    {
+      "test_name": "API Warehouse Stock",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/warehouse/stock",
+        "status_code": 200,
+        "response_size": 956
+      },
+      "error": null,
+      "timestamp": 1758279012.716467
+    },
+    {
+      "test_name": "API Warehouse Stats",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/warehouse/stats/summary",
+        "status_code": 200,
+        "response_size": 135
+      },
+      "error": null,
+      "timestamp": 1758279012.7188191
+    },
+    {
+      "test_name": "API Low Stock Alerts",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/warehouse/alerts/low-stock",
+        "status_code": 200,
+        "response_size": 336
+      },
+      "error": null,
+      "timestamp": 1758279012.720934
+    },
+    {
+      "test_name": "API Production Orders",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/production/orders",
+        "status_code": 200,
+        "response_size": 2053
+      },
+      "error": null,
+      "timestamp": 1758279012.723572
+    },
+    {
+      "test_name": "API Production Stats",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/production/stats/summary",
+        "status_code": 200,
+        "response_size": 168
+      },
+      "error": null,
+      "timestamp": 1758279012.7256188
+    },
+    {
+      "test_name": "API Size Runs",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/references/size-runs",
+        "status_code": 200,
+        "response_size": 421
+      },
+      "error": null,
+      "timestamp": 1758279012.727832
+    },
+    {
+      "test_name": "API Specifications",
+      "status": "PASSED",
+      "details": {
+        "endpoint": "/api/v1/references/specifications",
+        "status_code": 200,
+        "response_size": 789
+      },
+      "error": null,
+      "timestamp": 1758279012.730412
+    },
+    {
+      "test_name": "Models CREATE",
+      "status": "PASSED",
+      "details": {
+        "model_id": 4,
+        "article": "TEST-001"
+      },
+      "error": null,
+      "timestamp": 1758279012.741051
+    },
+    {
+      "test_name": "Models READ",
+      "status": "PASSED",
+      "details": {
+        "model_id": 4
+      },
+      "error": null,
+      "timestamp": 1758279012.743563
+    },
+    {
+      "test_name": "Models UPDATE",
+      "status": "PASSED",
+      "details": {
+        "model_id": 4
+      },
+      "error": null,
+      "timestamp": 1758279012.746148
+    },
+    {
+      "test_name": "Models DELETE",
+      "status": "PASSED",
+      "details": {
+        "model_id": 4
+      },
+      "error": null,
+      "timestamp": 1758279012.748197
+    },
+    {
+      "test_name": "Material Create - leather",
+      "status": "PASSED",
+      "details": {
+        "article": "MAT-LEATHER-001",
+        "group": "leather"
+      },
+      "error": null,
+      "timestamp": 1758279012.758997
+    },
+    {
+      "test_name": "Material Create - sole",
+      "status": "PASSED",
+      "details": {
+        "article": "MAT-SOLE-001",
+        "group": "sole"
+      },
+      "error": null,
+      "timestamp": 1758279012.7614012
+    },
+    {
+      "test_name": "Material Filter - leather",
+      "status": "PASSED",
+      "details": {
+        "group": "leather",
+        "count": 0
+      },
+      "error": null,
+      "timestamp": 1758279012.763751
+    },
+    {
+      "test_name": "Material Filter - sole",
+      "status": "PASSED",
+      "details": {
+        "group": "sole",
+        "count": 0
+      },
+      "error": null,
+      "timestamp": 1758279012.765965
+    },
+    {
+      "test_name": "Material Filter - hardware",
+      "status": "PASSED",
+      "details": {
+        "group": "hardware",
+        "count": 0
+      },
+      "error": null,
+      "timestamp": 1758279012.76811
+    },
+    {
+      "test_name": "Material Filter - lining",
+      "status": "PASSED",
+      "details": {
+        "group": "lining",
+        "count": 0
+      },
+      "error": null,
+      "timestamp": 1758279012.7701771
+    },
+    {
+      "test_name": "Material Filter - chemical",
+      "status": "PASSED",
+      "details": {
+        "group": "chemical",
+        "count": 0
+      },
+      "error": null,
+      "timestamp": 1758279012.772254
+    },
+    {
+      "test_name": "Material Filter - packaging",
+      "status": "PASSED",
+      "details": {
+        "group": "packaging",
+        "count": 0
+      },
+      "error": null,
+      "timestamp": 1758279012.774603
+    },
+    {
+      "test_name": "Specification Creation",
+      "status": "PASSED",
+      "details": {
+        "model_article": "TEST-SPEC-001",
+        "components_count": 2
+      },
+      "error": null,
+      "timestamp": 1758279012.7849789
+    },
+    {
+      "test_name": "Warehouse Stock List",
+      "status": "PASSED",
+      "details": {
+        "items_count": 0
+      },
+      "error": null,
+      "timestamp": 1758279012.7947829
+    },
+    {
+      "test_name": "Production Order Creation",
+      "status": "PASSED",
+      "details": {
+        "order_number": "PO-TEST-001",
+        "quantity": 50
+      },
+      "error": null,
+      "timestamp": 1758279012.8067892
+    }
+  ],
+  "backend_url": "http://localhost:8002",
+  "timestamp": 1758279012.807055
+}

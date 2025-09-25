@@ -1,0 +1,17 @@
+# Minimal Backend Dependencies - KRAI System v0.6
+
+# Core Framework
+fastapi
+uvicorn[standard]
+
+# Database
+sqlalchemy
+psycopg2-binary
+alembic
+
+# Data Validation
+pydantic
+pydantic-settings
+
+# Environment
+python-dotenv

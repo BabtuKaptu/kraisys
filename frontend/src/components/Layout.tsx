@@ -5,8 +5,8 @@ import {
   DashboardOutlined,
   ShopOutlined,
   InboxOutlined,
-  WarehouseOutlined,
-  FactoryOutlined,
+  BankOutlined,
+  BuildOutlined,  // Changed BuildOutlined to BuildOutlined
   BookOutlined,
   UserOutlined,
   MenuFoldOutlined,
@@ -46,12 +46,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     },
     {
       key: '/warehouse',
-      icon: <WarehouseOutlined />,
+      icon: <BankOutlined />,
       label: 'Склад',
     },
     {
       key: '/production',
-      icon: <FactoryOutlined />,
+      icon: <BuildOutlined />,
       label: 'Производство',
     },
     {

@@ -3,9 +3,9 @@ import { Card, Row, Col, Statistic, Typography, Progress, Table } from 'antd';
 import {
   ShopOutlined,
   InboxOutlined,
-  FactoryOutlined,
-  WarehouseOutlined,
-  TrendingUpOutlined,
+  BuildOutlined,
+  BankOutlined,
+  RiseOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
 
@@ -130,7 +130,7 @@ export const Dashboard: React.FC = () => {
             <Statistic
               title="Заказы в работе"
               value={stats.productionOrders}
-              prefix={<FactoryOutlined style={{ color: '#faad14' }} />}
+              prefix={<BuildOutlined style={{ color: '#faad14' }} />}
             />
           </Card>
         </Col>
@@ -139,7 +139,7 @@ export const Dashboard: React.FC = () => {
             <Statistic
               title="Критичные остатки"
               value={stats.lowStockItems}
-              prefix={<WarehouseOutlined style={{ color: '#ff4d4f' }} />}
+              prefix={<BankOutlined style={{ color: '#ff4d4f' }} />}
             />
           </Card>
         </Col>
@@ -152,7 +152,7 @@ export const Dashboard: React.FC = () => {
             className="content-card"
             title={
               <span>
-                <TrendingUpOutlined style={{ marginRight: 8 }} />
+                <RiseOutlined style={{ marginRight: 8 }} />
                 Загрузка производства
               </span>
             }

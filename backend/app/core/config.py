@@ -12,12 +12,12 @@ class Settings(BaseSettings):
 
     # Project Info
     PROJECT_NAME: str = "KRAI Production System"
-    VERSION: str = "0.6.0"
+    VERSION: str = "0.7.0"
     API_V1_STR: str = "/api/v1"
 
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql://four@localhost:5432/krai_system",
+        default="postgresql://four@localhost:5432/krai_mrp_v06",
         description="PostgreSQL database URL"
     )
 
@@ -32,8 +32,10 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_HOSTS: List[str] = [
         "http://localhost:3000",  # React dev server
-        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3001",  # Vite dev server (actual port)
+        "http://localhost:5173",  # Vite dev server (default)
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
         "http://127.0.0.1:5173"
     ]
 
