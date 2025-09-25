@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging, log_api_request, log_api_response
 from app.api.api_v1.api import api_router
 from app.db.init_db import init_db
+from app.middleware.auth import BasicAuthMiddleware
 
 # Initialize logging
 setup_logging()
@@ -73,6 +74,15 @@ async def log_requests(request: Request, call_next):
         )
         raise
 
+
+# Add Basic Auth middleware if enabled
+if settings.ENABLE_BASIC_AUTH:
+    app.add_middleware(
+        BasicAuthMiddleware,
+        username=settings.BASIC_AUTH_USERNAME,
+        password=settings.BASIC_AUTH_PASSWORD,
+    )
+    logger.info("Basic Authentication enabled")
 
 # Set up CORS
 app.add_middleware(

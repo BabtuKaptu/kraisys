@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     # Project Info
     PROJECT_NAME: str = "KRAI Production System"
-    VERSION: str = "0.7.0"
+    VERSION: str = "0.7.1"
     API_V1_STR: str = "/api/v1"
 
     # Database
@@ -38,6 +38,20 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3001",
         "http://127.0.0.1:5173"
     ]
+    
+    # Basic Auth credentials (v0.7.1 security)
+    BASIC_AUTH_USERNAME: str = Field(
+        default="admin",
+        description="Basic Auth username"
+    )
+    BASIC_AUTH_PASSWORD: str = Field(
+        default="change-me-in-production",
+        description="Basic Auth password - MUST be changed in production!"
+    )
+    ENABLE_BASIC_AUTH: bool = Field(
+        default=False,
+        description="Enable HTTP Basic Authentication"
+    )
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
